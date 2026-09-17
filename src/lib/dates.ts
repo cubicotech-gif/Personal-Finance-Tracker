@@ -35,6 +35,12 @@ const weekdayFormatter = new Intl.DateTimeFormat("en-GB", {
   weekday: "short",
 });
 
+const monthFormatter = new Intl.DateTimeFormat("en-GB", {
+  timeZone: TZ,
+  month: "long",
+  year: "numeric",
+});
+
 /** The Karachi calendar date for an instant. */
 export function bookedOn(at: Date = new Date()): IsoDate {
   return isoFormatter.format(at);
@@ -94,6 +100,31 @@ export function formatRelativeDay(iso: IsoDate): string {
 /** First day of the month containing `iso`. */
 export function monthStart(iso: IsoDate): IsoDate {
   return `${iso.slice(0, 7)}-01`;
+}
+
+/** Shift by whole months, clamping to the last valid day of the target month. */
+export function addMonths(iso: IsoDate, months: number): IsoDate {
+  const [y, m, d] = iso.split("-").map(Number);
+  if (y === undefined || m === undefined || d === undefined) return iso;
+  const zeroBased = (m - 1) + months;
+  const year = y + Math.floor(zeroBased / 12);
+  const month = ((zeroBased % 12) + 12) % 12;
+  // 31 Jan + 1 month is 28/29 Feb, not 2/3 March.
+  const lastDay = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+  const day = Math.min(d, lastDay);
+  return `${year.toString().padStart(4, "0")}-${(month + 1).toString().padStart(2, "0")}-${day
+    .toString()
+    .padStart(2, "0")}`;
+}
+
+/** Last day of the month containing `iso`. */
+export function monthEnd(iso: IsoDate): IsoDate {
+  return addDays(addMonths(monthStart(iso), 1), -1);
+}
+
+/** "September 2026" — the period heading on /boxes. */
+export function formatMonth(iso: IsoDate): string {
+  return monthFormatter.format(new Date(`${iso}T12:00:00Z`));
 }
 
 /** Monday of the week containing `iso`. */

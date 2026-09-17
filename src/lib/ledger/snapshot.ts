@@ -4,9 +4,12 @@ import { useLiveQuery } from "dexie-react-hooks";
 import { db } from "@/lib/db/dexie";
 import type {
   AccountRow,
+  AllocationRow,
+  BoxTransferRow,
   CategoryRow,
   CounterpartyRow,
   EntryRow,
+  PeriodRow,
   RateRow,
   TransactionRow,
 } from "@/lib/db/types";
@@ -38,6 +41,12 @@ export interface Snapshot {
   entriesByTransaction: Map<string, EntryRow[]>;
   /** Latest manually entered rate per currency, scaled by 1e8. */
   rates: Map<Currency, bigint>;
+
+  // The budget allocation layer. These never touch a balance or net worth —
+  // they are a second dimension sitting on top of the ledger, not part of it.
+  periods: PeriodRow[];
+  allocations: AllocationRow[];
+  boxTransfers: BoxTransferRow[];
 }
 
 export const EMPTY_SNAPSHOT: Snapshot = {
@@ -53,6 +62,9 @@ export const EMPTY_SNAPSHOT: Snapshot = {
   entries: [],
   entriesByTransaction: new Map(),
   rates: new Map(),
+  periods: [],
+  allocations: [],
+  boxTransfers: [],
 };
 
 function live<T extends { deleted_at: string | null }>(rows: T[]): T[] {
@@ -77,15 +89,35 @@ function latestRates(rows: RateRow[]): Map<Currency, bigint> {
   return rates;
 }
 
+/**
+ * Everything the snapshot is built from. An object rather than a positional
+ * list: there are nine same-shaped array arguments, and getting two of them the
+ * wrong way round would typecheck and silently produce wrong numbers.
+ */
+export interface SnapshotInput {
+  accounts?: AccountRow[];
+  counterparties?: CounterpartyRow[];
+  categories?: CategoryRow[];
+  transactions?: TransactionRow[];
+  entries?: EntryRow[];
+  rates?: RateRow[];
+  periods?: PeriodRow[];
+  allocations?: AllocationRow[];
+  boxTransfers?: BoxTransferRow[];
+}
+
 /** Exported so the read model can be exercised without IndexedDB. */
-export function buildSnapshot(
-  accounts: AccountRow[],
-  counterparties: CounterpartyRow[],
-  categories: CategoryRow[],
-  transactions: TransactionRow[],
-  entries: EntryRow[],
-  rates: RateRow[],
-): Snapshot {
+export function buildSnapshot({
+  accounts = [],
+  counterparties = [],
+  categories = [],
+  transactions = [],
+  entries = [],
+  rates = [],
+  periods = [],
+  allocations = [],
+  boxTransfers = [],
+}: SnapshotInput): Snapshot {
   const liveAccounts = live(accounts).sort(
     (a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name),
   );
@@ -125,21 +157,38 @@ export function buildSnapshot(
     entries: liveEntries,
     entriesByTransaction,
     rates: latestRates(rates),
+    periods: live(periods).sort((a, b) => a.start_date.localeCompare(b.start_date)),
+    allocations: live(allocations),
+    boxTransfers: live(boxTransfers),
   };
 }
 
 export function useSnapshot(): Snapshot {
   return (
     useLiveQuery(async () => {
-      const [accounts, counterparties, categories, transactions, entries, rates] = await Promise.all([
-        db.accounts.toArray(),
-        db.counterparties.toArray(),
-        db.categories.toArray(),
-        db.transactions.toArray(),
-        db.entries.toArray(),
-        db.rates.toArray(),
-      ]);
-      return buildSnapshot(accounts, counterparties, categories, transactions, entries, rates);
+      const [accounts, counterparties, categories, transactions, entries, rates, periods, allocations, boxTransfers] =
+        await Promise.all([
+          db.accounts.toArray(),
+          db.counterparties.toArray(),
+          db.categories.toArray(),
+          db.transactions.toArray(),
+          db.entries.toArray(),
+          db.rates.toArray(),
+          db.periods.toArray(),
+          db.allocations.toArray(),
+          db.box_transfers.toArray(),
+        ]);
+      return buildSnapshot({
+        accounts,
+        counterparties,
+        categories,
+        transactions,
+        entries,
+        rates,
+        periods,
+        allocations,
+        boxTransfers,
+      });
     }, []) ?? EMPTY_SNAPSHOT
   );
 }

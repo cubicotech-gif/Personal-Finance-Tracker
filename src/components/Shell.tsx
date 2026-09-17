@@ -9,6 +9,7 @@ import { cx } from "./ui";
 
 const TABS = [
   { href: "/log", label: "Log" },
+  { href: "/boxes", label: "Boxes" },
   { href: "/accounts", label: "Accounts" },
   { href: "/people", label: "People" },
 ] as const;
@@ -48,7 +49,7 @@ export function Shell({ title, children }: { title: string; children: ReactNode 
 
       <main className="flex-1 px-4 pt-4 pb-8">{children}</main>
 
-      <nav className="sticky bottom-0 grid grid-cols-3 border-t border-line bg-surface">
+      <nav className="sticky bottom-0 grid grid-cols-4 border-t border-line bg-surface">
         {TABS.map((tab) => {
           const active = pathname === tab.href;
           return (

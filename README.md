@@ -73,6 +73,21 @@ dimension on an entry (`entries.category_id`), and spending goes to a single
 it a ledger object and double-count the money. Nothing in `categories`,
 `periods`, `allocations` or `box_transfers` ever reaches a balance or net worth.
 
+The budget hangs off one identity, and everything on `/boxes` follows from
+keeping it true:
+
+```
+spendable cash  =  sum of all box balances  +  available to assign
+```
+
+Box balances carry forward without ever resetting, so a leftover rolls on and an
+overspend stays negative until it is covered. Assigning is capped by what is
+actually in hand — "available to assign" is derived from posted entries, so
+there is no way to budget income that has not arrived. A `reallocate` moves
+money for good; a `borrow` is tracked as an open IOU that shows in red against
+the source box until it is marked repaid. The float shortfall is not a box, is
+never budgetable, and is shown on its own as a hole to be returned.
+
 **The local database is the source of truth the UI reads.** Every screen renders
 from IndexedDB via Dexie, never from a network response, so the app behaves
 identically online and offline. Supabase is a replica: an ordered outbox of
@@ -94,15 +109,12 @@ src/lib/money.ts       bigint minor units; the only money arithmetic
 src/lib/dates.ts       Asia/Karachi booked_on handling
 src/lib/db/            Dexie schema, wire types, local-first mutations
 src/lib/sync/          outbox push, delta pull, the app provider
-src/lib/ledger/        the read model: balances, people, log rows, composition
+src/lib/ledger/        the read model: balances, people, log rows, envelopes
 src/lib/setup.ts       opening balances and spreadsheet paste
-src/app/               login, setup, log, accounts, people
+src/app/               login, setup, log, accounts, people, boxes
 ```
 
 ## Notes
-
-`/boxes` is not built yet — it is the last step and is deliberately left until
-the ledger is confirmed working.
 
 The service worker does its own precaching rather than using Serwist's
 `precacheEntries`. See the comment at the top of `src/app/sw.ts`: an upstream

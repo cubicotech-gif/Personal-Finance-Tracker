@@ -1,6 +1,16 @@
 import { strict as assert } from "node:assert";
 import { describe, it } from "node:test";
-import { addDays, bookedOn, daysBetween, isIsoDate, monthStart, weekStart } from "./dates";
+import {
+  addDays,
+  addMonths,
+  bookedOn,
+  daysBetween,
+  formatMonth,
+  isIsoDate,
+  monthEnd,
+  monthStart,
+  weekStart,
+} from "./dates";
 
 describe("bookedOn", () => {
   it("uses the Karachi calendar, not UTC", () => {
@@ -46,5 +56,31 @@ describe("calendar arithmetic", () => {
     assert.equal(isIsoDate("17-09-2026"), false);
     assert.equal(isIsoDate("2026-9-7"), false);
     assert.equal(isIsoDate(""), false);
+  });
+});
+
+describe("months", () => {
+  it("shifts by whole months", () => {
+    assert.equal(addMonths("2026-09-01", 1), "2026-10-01");
+    assert.equal(addMonths("2026-12-01", 1), "2027-01-01");
+    assert.equal(addMonths("2026-01-01", -1), "2025-12-01");
+    assert.equal(addMonths("2026-09-01", -13), "2025-08-01");
+  });
+
+  it("clamps rather than rolling into the next month", () => {
+    assert.equal(addMonths("2026-01-31", 1), "2026-02-28");
+    assert.equal(addMonths("2024-01-31", 1), "2024-02-29", "2024 is a leap year");
+    assert.equal(addMonths("2026-03-31", -1), "2026-02-28");
+  });
+
+  it("finds the last day of a month", () => {
+    assert.equal(monthEnd("2026-09-17"), "2026-09-30");
+    assert.equal(monthEnd("2026-02-01"), "2026-02-28");
+    assert.equal(monthEnd("2024-02-10"), "2024-02-29");
+    assert.equal(monthEnd("2026-12-25"), "2026-12-31");
+  });
+
+  it("labels a month", () => {
+    assert.equal(formatMonth("2026-09-01"), "September 2026");
   });
 });

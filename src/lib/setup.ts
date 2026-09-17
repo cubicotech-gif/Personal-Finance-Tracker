@@ -41,7 +41,7 @@ const DEFAULT_CATEGORIES: { name: string; kind: CategoryKind; icon: string }[] =
   { name: "Utilities", kind: "fixed", icon: "💡" },
   { name: "Groceries", kind: "variable", icon: "🛒" },
   { name: "Transport", kind: "variable", icon: "🛵" },
-  { name: "Eating out", kind: "variable", icon: "🍽" },
+  { name: "Eating out", kind: "variable", icon: "🍔" },
   { name: "Health", kind: "variable", icon: "💊" },
   { name: "Family", kind: "variable", icon: "👪" },
   { name: "Savings", kind: "goal", icon: "🎯" },

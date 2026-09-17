@@ -36,7 +36,7 @@ const SHELL = "app-shell";
  * not in it, so they are added explicitly — without them a cold reload while
  * offline has no document to serve.
  */
-const SHELL_ROUTES = ["/log", "/accounts", "/people", "/setup", "/login", "/offline"];
+const SHELL_ROUTES = ["/log", "/boxes", "/accounts", "/people", "/setup", "/login", "/offline"];
 
 const manifestUrls = (self.__SW_MANIFEST ?? []).map((entry) =>
   typeof entry === "string" ? entry : entry.url,

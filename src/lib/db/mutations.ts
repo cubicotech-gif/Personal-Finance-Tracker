@@ -20,7 +20,7 @@ import type {
   TransactionRow,
   UpsertableTable,
 } from "./types";
-import { type Currency, type Minor, formatRate, wire } from "@/lib/money";
+import { type Currency, type Minor, formatRate, minor, wire } from "@/lib/money";
 import { type IsoDate, today } from "@/lib/dates";
 
 /**
@@ -386,6 +386,23 @@ export async function upsertAllocation(
     amount_minor: row.amount_minor,
     deleted_at: null,
   });
+}
+
+/**
+ * Add to (or subtract from) what is assigned to a box this period.
+ *
+ * Reads the current figure from the database rather than from a rendered
+ * snapshot, so two quick taps on "assign" add up instead of the second
+ * overwriting the first with a stale base.
+ */
+export async function adjustAllocation(
+  period_id: string,
+  category_id: string,
+  delta: Minor,
+): Promise<AllocationRow> {
+  const existing = await db.allocations.where("[period_id+category_id]").equals([period_id, category_id]).first();
+  const current = existing ? minor(existing.amount_minor) : 0n;
+  return upsertAllocation(period_id, category_id, current + delta);
 }
 
 export async function createBoxTransfer(input: {

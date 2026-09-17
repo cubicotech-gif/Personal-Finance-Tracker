@@ -100,7 +100,7 @@ describe("summarise", () => {
     entry("e5", "t1", "equity", -55_000n),
   ];
 
-  const snapshot = buildSnapshot(accounts, [], [], [txn("t1", "2026-01-01")], entries, []);
+  const snapshot = buildSnapshot({ accounts, transactions: [txn("t1", "2026-01-01")], entries });
   const summary = summarise(accountBalances(snapshot));
 
   it("keeps float cash out of my own money", () => {
@@ -118,37 +118,28 @@ describe("summarise", () => {
   });
 
   it("does not subtract a float surplus from my money", () => {
-    const surplus = buildSnapshot(
-      accounts,
-      [],
-      [],
-      [txn("t1", "2026-01-01")],
-      [
+    const surplus = buildSnapshot({ accounts, transactions: [txn("t1", "2026-01-01")], entries: [
         entry("e1", "t1", "cash", 100_000n),
         entry("e2", "t1", "floatcash", 90_000n),
         entry("e3", "t1", "clientfloat", -80_000n),
         entry("e5", "t1", "equity", -110_000n),
-      ],
-      [],
-    );
+      ] });
     const result = summarise(accountBalances(surplus));
     assert.equal(result.floatShortfall, 10_000n);
     assert.equal(result.mine, 100_000n, "a surplus is still not mine");
   });
 
   it("keeps receivables out of what is free to spend", () => {
-    const withLoan = buildSnapshot(
-      [...accounts, account("recv", "Receivables", "asset")],
-      [counterparty("ali", "Ali")],
-      [],
-      [txn("t1", "2026-01-01"), txn("t2", "2026-02-01")],
-      [
+    const withLoan = buildSnapshot({
+      accounts: [...accounts, account("recv", "Receivables", "asset")],
+      counterparties: [counterparty("ali", "Ali")],
+      transactions: [txn("t1", "2026-01-01"), txn("t2", "2026-02-01")],
+      entries: [
         ...entries,
         entry("e6", "t2", "recv", 5_000n, { counterparty_id: "ali" }),
         entry("e7", "t2", "cash", -5_000n),
       ],
-      [],
-    );
+    });
     const result = summarise(accountBalances(withLoan));
     // Cash went down by the Rs 50 lent, and the receivable does not replace it.
     assert.equal(result.mine, 65_000n);
@@ -163,14 +154,12 @@ describe("summarise", () => {
   });
 
   it("converts a foreign account at the latest rate", () => {
-    const withUsd = buildSnapshot(
-      [...accounts, account("usd", "USD Cash", "asset", { currency: "USD" })],
-      [],
-      [],
-      [txn("t1", "2026-01-01")],
-      [...entries, entry("e6", "t1", "usd", 10_000n)],
-      [rate("USD", "2026-01-01", "270"), rate("USD", "2026-06-01", "278.5")],
-    );
+    const withUsd = buildSnapshot({
+      accounts: [...accounts, account("usd", "USD Cash", "asset", { currency: "USD" })],
+      transactions: [txn("t1", "2026-01-01")],
+      entries: [...entries, entry("e6", "t1", "usd", 10_000n)],
+      rates: [rate("USD", "2026-01-01", "270"), rate("USD", "2026-06-01", "278.5")],
+    });
     const balances = accountBalances(withUsd);
     const usd = balances.find((b) => b.account.id === "usd");
     // $100.00 at the newer 278.50 rate is Rs 27,850.
@@ -202,7 +191,7 @@ describe("debtPositions", () => {
       entry("e3", "t3", "recv", -4_000n, { counterparty_id: "ali" }),
       entry("e3b", "t3", "cash", 4_000n),
     ];
-    const snapshot = buildSnapshot(accounts, people, [], transactions, entries, []);
+    const snapshot = buildSnapshot({ accounts, counterparties: people, transactions, entries });
     const [position] = debtPositions(snapshot);
 
     assert.equal(position?.direction, "owes_me");
@@ -220,7 +209,7 @@ describe("debtPositions", () => {
       entry("e3", "t3", "recv", -5_000n, { counterparty_id: "ali" }),
       entry("e3b", "t3", "cash", 5_000n),
     ];
-    const snapshot = buildSnapshot(accounts, people, [], transactions, entries, []);
+    const snapshot = buildSnapshot({ accounts, counterparties: people, transactions, entries });
     const [position] = debtPositions(snapshot);
     assert.equal(position?.amountPkr, 3_000n);
     assert.equal(position?.openedOn, "2026-06-01");
@@ -233,14 +222,12 @@ describe("debtPositions", () => {
       entry("e2", "t2", "recv", -5_000n, { counterparty_id: "ali" }),
       entry("e2b", "t2", "cash", 5_000n),
     ];
-    const snapshot = buildSnapshot(
+    const snapshot = buildSnapshot({
       accounts,
-      people,
-      [],
-      [txn("t1", "2026-01-01"), txn("t2", "2026-02-01")],
+      counterparties: people,
+      transactions: [txn("t1", "2026-01-01"), txn("t2", "2026-02-01")],
       entries,
-      [],
-    );
+    });
     assert.equal(debtPositions(snapshot).length, 0);
   });
 
@@ -249,7 +236,12 @@ describe("debtPositions", () => {
       entry("e1", "t1", "pay", -8_000n, { counterparty_id: "bilal", due_on: "2026-03-01" }),
       entry("e1b", "t1", "cash", 8_000n),
     ];
-    const snapshot = buildSnapshot(accounts, people, [], [txn("t1", "2026-01-01")], entries, []);
+    const snapshot = buildSnapshot({
+      accounts,
+      counterparties: people,
+      transactions: [txn("t1", "2026-01-01")],
+      entries,
+    });
     const [position] = debtPositions(snapshot);
     assert.equal(position?.direction, "i_owe");
     assert.equal(position?.amountPkr, 8_000n);
@@ -263,7 +255,12 @@ describe("debtPositions", () => {
       entry("e1", "t1", "exp", 1_000n, { counterparty_id: "ali" }),
       entry("e1b", "t1", "cash", -1_000n),
     ];
-    const snapshot = buildSnapshot(withExpense, people, [], [txn("t1", "2026-01-01")], entries, []);
+    const snapshot = buildSnapshot({
+      accounts: withExpense,
+      counterparties: people,
+      transactions: [txn("t1", "2026-01-01")],
+      entries,
+    });
     assert.equal(debtPositions(snapshot).length, 0, "an expense note is not a debt");
   });
 
@@ -275,7 +272,12 @@ describe("debtPositions", () => {
       entry("e2", "t2", "recv", 9_000n, { counterparty_id: "ali" }),
       entry("e2b", "t2", "cash", -9_000n),
     ];
-    const snapshot = buildSnapshot(accounts, people, [], [txn("t1", "2026-01-01"), deleted], entries, []);
+    const snapshot = buildSnapshot({
+      accounts,
+      counterparties: people,
+      transactions: [txn("t1", "2026-01-01"), deleted],
+      entries,
+    });
     const [position] = debtPositions(snapshot);
     assert.equal(position?.amountPkr, 5_000n);
   });
@@ -289,14 +291,11 @@ describe("composeEntries", () => {
     account("recv", "Receivables", "asset"),
     account("pay", "Payables", "liability"),
   ];
-  const snapshot = buildSnapshot(
+  const snapshot = buildSnapshot({
     accounts,
-    [counterparty("ali", "Ali")],
-    [category("groceries", "Groceries")],
-    [],
-    [],
-    [],
-  );
+    counterparties: [counterparty("ali", "Ali")],
+    categories: [category("groceries", "Groceries")],
+  });
 
   it("balances an expense and puts the envelope on the entry, not an account", async () => {
     const entries = await composeEntries(snapshot, {
@@ -370,14 +369,12 @@ describe("decompose", () => {
       entry("e1", "t1", "cash", -45_000n),
       entry("e2", "t1", "exp", 45_000n, { category_id: "groceries" }),
     ];
-    const snapshot = buildSnapshot(
+    const snapshot = buildSnapshot({
       accounts,
-      [],
-      [category("groceries", "Groceries")],
-      [txn("t1", "2026-09-17", "Bakery")],
+      categories: [category("groceries", "Groceries")],
+      transactions: [txn("t1", "2026-09-17", "Bakery")],
       entries,
-      [],
-    );
+    });
     const draft = decompose(snapshot, "t1");
     assert.equal(draft?.direction, "out");
     assert.equal(draft?.kind, "expense");
@@ -391,7 +388,12 @@ describe("decompose", () => {
       entry("e1", "t1", "cash", 4_000n),
       entry("e2", "t1", "recv", -4_000n, { counterparty_id: "ali" }),
     ];
-    const snapshot = buildSnapshot(accounts, [counterparty("ali", "Ali")], [], [txn("t1", "2026-09-17")], entries, []);
+    const snapshot = buildSnapshot({
+      accounts,
+      counterparties: [counterparty("ali", "Ali")],
+      transactions: [txn("t1", "2026-09-17")],
+      entries,
+    });
     const draft = decompose(snapshot, "t1");
     assert.equal(draft?.kind, "receive_repayment");
     assert.equal(draft?.counterpartyId, "ali");
@@ -403,7 +405,11 @@ describe("decompose", () => {
       entry("e2", "t1", "recv", 5_000n),
       entry("e3", "t1", "equity", -105_000n),
     ];
-    const snapshot = buildSnapshot(accounts, [], [], [txn("t1", "2026-01-01", "Opening balances")], entries, []);
+    const snapshot = buildSnapshot({
+      accounts,
+      transactions: [txn("t1", "2026-01-01", "Opening balances")],
+      entries,
+    });
     assert.equal(decompose(snapshot, "t1"), null);
   });
 });
@@ -417,7 +423,7 @@ describe("toLogRow", () => {
 
   it("labels a two-account movement as a transfer", () => {
     const entries = [entry("e1", "t1", "cash", -10_000n), entry("e2", "t1", "bank", 10_000n)];
-    const snapshot = buildSnapshot(accounts, [], [], [txn("t1", "2026-09-17")], entries, []);
+    const snapshot = buildSnapshot({ accounts, transactions: [txn("t1", "2026-09-17")], entries });
     const row = toLogRow(snapshot, snapshot.transactions[0] as TransactionRow);
     assert.equal(row.direction, "transfer");
     assert.equal(row.account?.id, "cash", "shown leaving the source account");
@@ -431,7 +437,11 @@ describe("toLogRow", () => {
       entry("e2", "t1", "bank", 310_000n),
       entry("e3", "t1", "equity", -335_000n),
     ];
-    const snapshot = buildSnapshot(withEquity, [], [], [txn("t1", "2026-01-01", "Opening balances")], entries, []);
+    const snapshot = buildSnapshot({
+      accounts: withEquity,
+      transactions: [txn("t1", "2026-01-01", "Opening balances")],
+      entries,
+    });
     const row = toLogRow(snapshot, snapshot.transactions[0] as TransactionRow);
     assert.equal(row.direction, "split");
     assert.equal(row.amount, 335_000n, "the money that moved, not one arbitrary leg");
@@ -444,7 +454,7 @@ describe("toLogRow", () => {
 
   it("reports an outflow with a positive amount and an out direction", () => {
     const entries = [entry("e1", "t1", "cash", -45_000n), entry("e2", "t1", "exp", 45_000n)];
-    const snapshot = buildSnapshot(accounts, [], [], [txn("t1", "2026-09-17")], entries, []);
+    const snapshot = buildSnapshot({ accounts, transactions: [txn("t1", "2026-09-17")], entries });
     const row = toLogRow(snapshot, snapshot.transactions[0] as TransactionRow);
     assert.equal(row.direction, "out");
     assert.equal(row.amount, 45_000n);
