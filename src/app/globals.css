@@ -1,0 +1,54 @@
+@import "tailwindcss";
+
+/*
+ * Semantic tokens only. The spec asks for no theming beyond Tailwind's default,
+ * so this is a light-only palette with named roles — "danger" has to mean one
+ * exact thing because over-budget and overdue both depend on it reading
+ * instantly.
+ */
+@theme {
+  --color-canvas: #f6f6f4;
+  --color-surface: #ffffff;
+  --color-line: #e4e4e1;
+  --color-ink: #16161a;
+  --color-muted: #6b6b73;
+  --color-accent: #1f6f4a;
+  --color-accent-soft: #e6f1ea;
+  --color-danger: #b3261e;
+  --color-danger-soft: #fbe9e7;
+  --color-positive: #1f6f4a;
+}
+
+html {
+  /* Stop iOS zooming the page when the amount field takes focus. */
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  /* Respect the notch and the home indicator when installed. */
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Money must line up vertically when scanned in a column. */
+.tabular {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+/* Remove the spinner on number-ish inputs; the keypad is the input method. */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
