@@ -12,7 +12,7 @@ import {
 } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import type { Session } from "@supabase/supabase-js";
-import { clearReplica, db, getMeta, setMeta } from "@/lib/db/dexie";
+import { clearLocalData, db, getMeta, setMeta } from "@/lib/db/dexie";
 import { setCurrentUser } from "@/lib/db/mutations";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase/client";
 import { syncNow } from "./engine";
@@ -95,7 +95,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     void (async () => {
       const known = await getMeta("user_id");
       if (cancelled) return;
-      if (known && known !== userId) await clearReplica();
+      if (known && known !== userId) await clearLocalData();
       await setMeta("user_id", userId);
     })();
     return () => {
@@ -149,10 +149,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [pending, sync]);
 
   const signOut = useCallback(async () => {
+    // Best effort: get queued writes to the server before dropping them. If the
+    // device is offline this does nothing and the caller has already warned.
+    try {
+      await sync();
+    } catch {
+      // Signing out must not be blocked by a sync failure.
+    }
     await supabase().auth.signOut();
-    await clearReplica();
+    await clearLocalData();
     setCurrentUser(null);
-  }, []);
+  }, [sync]);
 
   const value = useMemo<AppContextValue>(
     () => ({

@@ -68,10 +68,14 @@ export async function setMeta(key: string, value: string): Promise<void> {
 }
 
 /**
- * Drop every replicated row but keep the outbox: used on sign-out, and when the
- * signed-in user changes, so one user's cache can never be read as another's.
+ * Wipe everything local, including the outbox.
+ *
+ * Used on sign-out and when the signed-in user changes. The outbox has to go
+ * with the rest: a queued write belongs to the user who made it, and replaying
+ * it under a different session would either fail RLS or, worse, file one
+ * person's transaction under another's user_id.
  */
-export async function clearReplica(): Promise<void> {
+export async function clearLocalData(): Promise<void> {
   await db.transaction(
     "rw",
     [
@@ -84,6 +88,7 @@ export async function clearReplica(): Promise<void> {
       db.periods,
       db.allocations,
       db.box_transfers,
+      db.outbox,
       db.meta,
     ],
     async () => {
@@ -97,6 +102,7 @@ export async function clearReplica(): Promise<void> {
         db.periods.clear(),
         db.allocations.clear(),
         db.box_transfers.clear(),
+        db.outbox.clear(),
         db.meta.clear(),
       ]);
     },

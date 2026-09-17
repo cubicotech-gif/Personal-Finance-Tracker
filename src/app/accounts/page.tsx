@@ -8,6 +8,7 @@ import { Button, Card, Empty, ErrorNote, Input, SectionTitle, cx } from "@/compo
 import { rateMissing, useSnapshot } from "@/lib/ledger/snapshot";
 import { accountBalances, realMoneyAccounts, summarise } from "@/lib/ledger/accounts";
 import { upsertRate } from "@/lib/db/mutations";
+import { useApp } from "@/lib/sync/provider";
 import { formatRate, parseRate, type Minor } from "@/lib/money";
 import { today } from "@/lib/dates";
 
@@ -100,6 +101,61 @@ function AccountsScreen() {
           <SectionTitle>Liabilities</SectionTitle>
           <AccountList rows={liabilities} />
         </section>
+      )}
+
+      <SignOut />
+    </div>
+  );
+}
+
+/**
+ * The only account-level control in the app. There is no settings page, but
+ * signing out has to be reachable from somewhere, and this is the page that is
+ * already about the account rather than about the ledger.
+ */
+function SignOut() {
+  const { email, signOut, pending, online } = useApp();
+  const [confirming, setConfirming] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  return (
+    <div className="border-t border-line pt-4 text-center">
+      <p className="text-xs text-muted">{email}</p>
+      {confirming ? (
+        <div className="mt-2 space-y-2">
+          {pending > 0 && (
+            <p className="text-xs text-danger">
+              {pending} change{pending === 1 ? "" : "s"} still waiting to sync.
+              {online
+                ? " They will be sent before signing out."
+                : " You are offline — signing out now discards them."}
+            </p>
+          )}
+          <div className="flex justify-center gap-2">
+            <Button
+              type="button"
+              variant="danger"
+              disabled={busy}
+              onClick={async () => {
+                setBusy(true);
+                await signOut();
+              }}
+            >
+              {busy ? "Signing out…" : "Sign out"}
+            </Button>
+            <Button type="button" variant="ghost" onClick={() => setConfirming(false)}>
+              Cancel
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setConfirming(true)}
+          className="mt-1 text-xs text-muted underline"
+        >
+          Sign out
+        </button>
       )}
     </div>
   );
