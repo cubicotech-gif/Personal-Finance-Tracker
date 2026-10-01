@@ -10,13 +10,14 @@ const easeOut = (t: number) => 1 - Math.pow(1 - t, 3);
  * Tween a bigint to its new value over `ms`, instead of snapping.
  *
  * Interpolation is done in bigint (progress in thousandths), so a large
- * balance never passes through a float. With reduced motion the target is
- * returned as-is.
+ * balance never passes through a float. `fromZero` counts up from 0 on first
+ * render, for a hero figure. With reduced motion the target is returned as-is.
  */
-export function useCountUp(target: bigint, ms = 400): bigint {
+export function useCountUp(target: bigint, ms = 400, fromZero = false): bigint {
   const reduce = useReducedMotion();
-  const [shown, setShown] = useState(target);
-  const current = useRef(target);
+  const start = fromZero ? 0n : target;
+  const [shown, setShown] = useState(start);
+  const current = useRef(start);
 
   useEffect(() => {
     if (reduce || current.current === target) return;

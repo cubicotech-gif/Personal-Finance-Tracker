@@ -74,6 +74,8 @@ body {
   /* Taps should feel instant; no 300ms wait, no double-tap zoom on the pad. */
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
+  /* No browser pull-to-reload: screens that refresh do it themselves. */
+  overscroll-behavior-y: contain;
 }
 
 /* Money must line up vertically when scanned in a column. */

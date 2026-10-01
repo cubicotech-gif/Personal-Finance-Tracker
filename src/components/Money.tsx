@@ -21,6 +21,7 @@ export function Money({
   symbol = true,
   tone = "auto",
   animate = true,
+  countOnMount = false,
   className,
 }: {
   amount: Minor;
@@ -31,9 +32,11 @@ export function Money({
   /** "auto" colours negatives red; "plain" never colours; "danger" always does. */
   tone?: "auto" | "plain" | "danger" | "positive";
   animate?: boolean;
+  /** Count up from zero when first shown. For hero figures. */
+  countOnMount?: boolean;
   className?: string;
 }) {
-  const counted = useCountUp(amount, 400);
+  const counted = useCountUp(amount, 400, countOnMount);
   const shown = animate ? counted : amount;
 
   const colour =
