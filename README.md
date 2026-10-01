@@ -119,3 +119,9 @@ src/app/               login, setup, log, accounts, people, boxes
 The service worker does its own precaching rather than using Serwist's
 `precacheEntries`. See the comment at the top of `src/app/sw.ts`: an upstream
 bug in `@serwist/utils@9.5` hangs `install` forever if any single asset fails.
+
+## Deploying
+
+Import the repo into Vercel (framework: Next.js) and set
+`NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` before the first
+build. They are inlined at build time, so changing them requires a redeploy.
