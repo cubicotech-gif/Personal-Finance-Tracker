@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { IconChevronDown } from "@tabler/icons-react";
 import { CategoryIcon, SourceIcon } from "@/components/CategoryIcon";
+import { AmountReadout } from "@/components/AmountReadout";
 import { Money } from "@/components/Money";
 import { NumberPad } from "@/components/NumberPad";
 import { TABBAR } from "@/components/Shell";
@@ -24,8 +25,8 @@ import {
 import { recentLogRows, type LogRow } from "@/lib/ledger/log";
 import { mostUsedAccountId } from "@/lib/ledger/accounts";
 import { today } from "@/lib/dates";
-import { formatTyped } from "@/lib/format";
 import { padInput, type PadKey } from "@/lib/pad";
+import { usePadKeyboard } from "@/lib/usePadKeyboard";
 import { parseAmount, type Currency, type Minor } from "@/lib/money";
 import { RecentList } from "./RecentList";
 import { Reconcile } from "./Reconcile";
@@ -80,15 +81,6 @@ function initialForm(): FormState {
     bookedOn: today(),
     editingId: null,
   };
-}
-
-/** The amount shrinks as it grows so twelve digits still fit one line. */
-function amountSize(text: string): string {
-  const n = text.length;
-  if (n <= 9) return "text-[56px] short:text-[44px]";
-  if (n <= 12) return "text-[44px] short:text-[36px]";
-  if (n <= 15) return "text-[36px] short:text-[30px]";
-  return "text-[28px]";
 }
 
 function buzz() {
@@ -147,18 +139,7 @@ export function LogScreen() {
     setToast(null);
   }, []);
 
-  // A hardware keyboard works too, which keeps the screen usable on a desktop.
-  useEffect(() => {
-    function onKeyDown(event: KeyboardEvent) {
-      const target = event.target as HTMLElement | null;
-      if (target?.closest("input, textarea, select, [role=button]")) return;
-      if (event.metaKey || event.ctrlKey || event.altKey) return;
-      if (/^[0-9.]$/.test(event.key)) press(event.key as PadKey);
-      else if (event.key === "Backspace") press("back");
-    }
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [press]);
+  usePadKeyboard(press);
 
   // Live balance of the chosen box, moving as the amount is typed.
   const box = form.categoryId ? boxes.boxes.find((b) => b.category.id === form.categoryId) : undefined;
@@ -276,8 +257,6 @@ export function LogScreen() {
     say({ message: "Deleted", action: { label: "Undo", run: () => void restoreTransaction(id) } });
   }
 
-  const amountText = formatTyped(form.amount, currency);
-  const symbol = currency === "PKR" ? "₨" : "$";
   const empty = form.amount === "";
 
   return (
@@ -298,18 +277,7 @@ export function LogScreen() {
               </button>
             </div>
           )}
-          <div
-            role="status"
-            aria-label="Amount"
-            className={cx(
-              "tabular flex items-baseline justify-end gap-2 overflow-hidden font-medium leading-tight tracking-tight",
-              amountSize(amountText),
-              empty ? "text-muted" : "text-ink",
-            )}
-          >
-            <span className="text-muted">{symbol}</span>
-            <span>{amountText}</span>
-          </div>
+          <AmountReadout value={form.amount} currency={currency} />
         </div>
 
         {/* Category (out) or source (in) as tiles ----------------------- */}
