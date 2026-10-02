@@ -2,6 +2,7 @@
 
 import type { AccountRow } from "@/lib/db/types";
 import type { Currency, Minor } from "@/lib/money";
+import { type IsoDate, addDays, monthStart } from "@/lib/dates";
 import { type Snapshot, entryAmount, pkr } from "./snapshot";
 
 /**
@@ -27,7 +28,12 @@ export interface AccountBalance {
   isReceivable: boolean;
 }
 
-export function accountBalances(snapshot: Snapshot): AccountBalance[] {
+/**
+ * Balances now, or as they stood at the end of `asOf` when given. Conversion
+ * always uses the latest rate: rates are entered by hand and not kept as
+ * history, so a past USD balance is valued at today's rate.
+ */
+export function accountBalances(snapshot: Snapshot, asOf?: IsoDate): AccountBalance[] {
   const totals = new Map<string, Minor>();
   // Derived, not named: an account is a receivable/payable because it carries
   // counterparty-tagged lines. composeEntries only ever puts a counterparty on
@@ -36,6 +42,10 @@ export function accountBalances(snapshot: Snapshot): AccountBalance[] {
   const withCounterparty = new Set<string>();
 
   for (const entry of snapshot.entries) {
+    if (asOf !== undefined) {
+      const bookedOn = snapshot.transactionsById.get(entry.transaction_id)?.booked_on;
+      if (!bookedOn || bookedOn > asOf) continue;
+    }
     totals.set(entry.account_id, (totals.get(entry.account_id) ?? 0n) + entryAmount(entry));
     if (entry.counterparty_id) withCounterparty.add(entry.account_id);
   }
@@ -140,4 +150,49 @@ export function mostUsedAccountId(snapshot: Snapshot): string | undefined {
     }
   }
   return best ?? snapshot.accounts.find((a) => a.type === "asset" && !a.archived)?.id;
+}
+
+export interface NetWorthChange {
+  current: Minor;
+  /** Net worth at the end of last month. */
+  previous: Minor;
+  delta: Minor;
+  /** False when nothing was booked by then, so there is no month to compare to. */
+  hasPrevious: boolean;
+}
+
+/** Net worth now against the close of last month. */
+export function netWorthChange(snapshot: Snapshot, now: IsoDate): NetWorthChange {
+  const lastMonthEnd = addDays(monthStart(now), -1);
+  const current = summarise(accountBalances(snapshot)).netWorth;
+  const previous = summarise(accountBalances(snapshot, lastMonthEnd)).netWorth;
+  return {
+    current,
+    previous,
+    delta: current - previous,
+    hasPrevious: snapshot.transactions.some((transaction) => transaction.booked_on <= lastMonthEnd),
+  };
+}
+
+export type AccountGroup = "float" | "operating" | "buffer" | "usd";
+
+export const GROUP_ORDER: readonly AccountGroup[] = ["float", "operating", "buffer", "usd"];
+
+export const GROUP_LABEL: Record<AccountGroup, string> = {
+  float: "Float",
+  operating: "Operating",
+  buffer: "Buffer",
+  usd: "USD",
+};
+
+/**
+ * Which list an account sits in. Nothing in the data says "buffer" or
+ * "operating", so this reads what is there: the float flag, the currency, and
+ * — for the buffer — the name. Everything else is operating cash.
+ */
+export function groupOf(account: AccountRow): AccountGroup {
+  if (account.is_float) return "float";
+  if (account.currency !== "PKR") return "usd";
+  if (/buffer|reserve|emergency|rainy|saving/i.test(account.name)) return "buffer";
+  return "operating";
 }

@@ -2,7 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { Button, Card, Chip, ErrorNote, Input, Label, SectionTitle, Select, cx } from "@/components/ui";
+import { IconX } from "@tabler/icons-react";
+import { Button, Card, Chip, ChipRow, ErrorNote, Input, Label, SectionTitle, Segmented } from "@/components/ui";
 import { useApp } from "@/lib/sync/provider";
 import { useSnapshot } from "@/lib/ledger/snapshot";
 import { dropHeader, parseRows } from "@/lib/paste";
@@ -22,6 +23,19 @@ import {
   type DebtDraftRow,
 } from "@/lib/setup";
 
+const CURRENCY_OPTIONS = [
+  { value: "PKR", label: "PKR" },
+  { value: "USD", label: "USD" },
+] as const;
+const KIND_OPTIONS = [
+  { value: "person", label: "Person" },
+  { value: "float_client", label: "Float client" },
+] as const;
+const DIRECTION_OPTIONS = [
+  { value: "owes_me", label: "Owes me" },
+  { value: "i_owe", label: "I owe" },
+] as const;
+
 /** A paste target that appends parsed spreadsheet rows to a section. */
 function PasteBox({
   hint,
@@ -39,7 +53,7 @@ function PasteBox({
 
   if (!open) {
     return (
-      <button type="button" onClick={() => setOpen(true)} className="text-sm text-accent underline">
+      <button type="button" onClick={() => setOpen(true)} className="min-h-11 text-accent underline">
         Paste from spreadsheet
       </button>
     );
@@ -50,7 +64,7 @@ function PasteBox({
       <p className="text-xs text-muted">
         {hint}
         <br />
-        <code className="mt-1 inline-block whitespace-pre rounded bg-canvas px-1.5 py-1 text-[11px] leading-5">
+        <code className="mt-1 inline-block whitespace-pre rounded-xl bg-raised px-2 py-1.5 text-[11px] leading-5">
           {example}
         </code>
       </p>
@@ -60,7 +74,7 @@ function PasteBox({
         value={text}
         onChange={(e) => setText(e.target.value)}
         placeholder="Paste cells here"
-        className="w-full rounded-lg border border-line bg-surface p-3 font-mono text-sm focus:border-ink focus:outline-none"
+        className="w-full rounded-2xl bg-surface p-4 font-mono text-sm focus:outline-2 focus:outline-accent"
       />
       <div className="flex gap-2">
         <Button
@@ -85,16 +99,16 @@ function PasteBox({
 
 function RowShell({ children, onRemove }: { children: React.ReactNode; onRemove: () => void }) {
   return (
-    <Card className="p-3">
+    <Card className="p-4">
       <div className="flex items-start gap-2">
-        <div className="min-w-0 flex-1 space-y-2">{children}</div>
+        <div className="min-w-0 flex-1 space-y-3">{children}</div>
         <button
           type="button"
           onClick={onRemove}
           aria-label="Remove row"
-          className="shrink-0 rounded-lg px-2 py-1 text-muted hover:bg-canvas hover:text-danger"
+          className="-mr-2 -mt-2 flex size-11 shrink-0 items-center justify-center rounded-2xl text-muted hover:text-danger"
         >
-          ✕
+          <IconX size={20} stroke={1.75} />
         </button>
       </div>
     </Card>
@@ -146,14 +160,14 @@ export default function SetupPage() {
   }
 
   return (
-    <main className="mx-auto max-w-lg px-4 py-6 pb-24">
-      <h1 className="text-xl font-semibold">Opening balances</h1>
-      <p className="mt-1 mb-6 text-sm text-muted">
+    <main className="mx-auto max-w-lg px-4 pt-8">
+      <h1 className="t-section">Opening balances</h1>
+      <p className="mt-2 mb-6 text-muted">
         Everything below is written as one balanced transaction against Equity:Opening, dated the as-of
         date. You can re-run this later to add accounts; existing ones are matched by name.
       </p>
 
-      <div className="mb-6 grid grid-cols-2 gap-3">
+      <div className="mb-8 grid grid-cols-2 gap-3">
         <div>
           <Label htmlFor="asof">As of</Label>
           <Input id="asof" type="date" value={asOf} onChange={(e) => setAsOf(e.target.value)} />
@@ -173,7 +187,7 @@ export default function SetupPage() {
       </div>
 
       {/* Accounts ---------------------------------------------------------- */}
-      <section className="mb-8">
+      <section className="mb-10">
         <SectionTitle>Accounts</SectionTitle>
         <div className="space-y-2">
           {accounts.map((row, index) => (
@@ -183,38 +197,40 @@ export default function SetupPage() {
             >
               <Input
                 placeholder="Account name"
+                className="bg-raised"
                 value={row.name}
                 onChange={(e) => patch(setAccounts, index, { name: e.target.value })}
               />
-              <div className="grid grid-cols-3 gap-2">
-                <Select
-                  aria-label="Type"
-                  value={row.type}
-                  onChange={(e) => patch(setAccounts, index, { type: e.target.value })}
-                >
-                  {ACCOUNT_TYPES.map((type) => (
-                    <option key={type} value={type}>
-                      {type}
-                    </option>
-                  ))}
-                </Select>
-                <Select
-                  aria-label="Currency"
-                  value={row.currency}
-                  onChange={(e) => patch(setAccounts, index, { currency: e.target.value })}
-                >
-                  <option value="PKR">PKR</option>
-                  <option value="USD">USD</option>
-                </Select>
+              <ChipRow label="Type">
+                {ACCOUNT_TYPES.map((type) => (
+                  <Chip
+                    key={type}
+                    className={row.type === type ? undefined : "bg-raised"}
+                    selected={row.type === type}
+                    onClick={() => patch(setAccounts, index, { type })}
+                  >
+                    {type}
+                  </Chip>
+                ))}
+              </ChipRow>
+              <div className="grid grid-cols-2 gap-2">
+                <Segmented
+                  label="Currency"
+                  options={CURRENCY_OPTIONS}
+                  value={row.currency === "USD" ? "USD" : "PKR"}
+                  onChange={(currency) => patch(setAccounts, index, { currency })}
+                />
                 <Input
                   aria-label="Opening balance"
                   inputMode="decimal"
                   placeholder="Opening"
+                  className="bg-raised"
                   value={row.opening}
                   onChange={(e) => patch(setAccounts, index, { opening: e.target.value })}
                 />
               </div>
               <Chip
+                className={row.isFloat ? undefined : "bg-raised"}
                 selected={row.isFloat}
                 onClick={() => patch(setAccounts, index, { isFloat: !row.isFloat })}
               >
@@ -223,7 +239,7 @@ export default function SetupPage() {
             </RowShell>
           ))}
         </div>
-        <div className="mt-3 flex items-center gap-4">
+        <div className="mt-3 flex flex-wrap items-center gap-4">
           <Button type="button" onClick={() => setAccounts((rows) => [...rows, blankAccount()])}>
             Add account
           </Button>
@@ -237,7 +253,7 @@ export default function SetupPage() {
       </section>
 
       {/* People ------------------------------------------------------------ */}
-      <section className="mb-8">
+      <section className="mb-10">
         <SectionTitle>People and float clients</SectionTitle>
         <div className="space-y-2">
           {counterparties.map((row, index) => (
@@ -247,28 +263,26 @@ export default function SetupPage() {
             >
               <Input
                 placeholder="Name"
+                className="bg-raised"
                 value={row.name}
                 onChange={(e) => patch(setCounterparties, index, { name: e.target.value })}
               />
-              <div className="grid grid-cols-2 gap-2">
-                <Select
-                  aria-label="Kind"
-                  value={row.kind}
-                  onChange={(e) => patch(setCounterparties, index, { kind: e.target.value })}
-                >
-                  <option value="person">Person</option>
-                  <option value="float_client">Float client</option>
-                </Select>
-                <Input
-                  placeholder="Notes"
-                  value={row.notes}
-                  onChange={(e) => patch(setCounterparties, index, { notes: e.target.value })}
-                />
-              </div>
+              <Segmented
+                label="Kind"
+                options={KIND_OPTIONS}
+                value={row.kind === "float_client" ? "float_client" : "person"}
+                onChange={(kind) => patch(setCounterparties, index, { kind })}
+              />
+              <Input
+                placeholder="Notes"
+                className="bg-raised"
+                value={row.notes}
+                onChange={(e) => patch(setCounterparties, index, { notes: e.target.value })}
+              />
             </RowShell>
           ))}
         </div>
-        <div className="mt-3 flex items-center gap-4">
+        <div className="mt-3 flex flex-wrap items-center gap-4">
           <Button type="button" onClick={() => setCounterparties((rows) => [...rows, blankCounterparty()])}>
             Add person
           </Button>
@@ -282,9 +296,9 @@ export default function SetupPage() {
       </section>
 
       {/* Debts ------------------------------------------------------------- */}
-      <section className="mb-8">
+      <section className="mb-10">
         <SectionTitle>Money already owed</SectionTitle>
-        <p className="mb-2 text-xs text-muted">
+        <p className="mb-3 text-xs text-muted">
           Booked to Receivables / Payables, or to Client float for a float client. All PKR.
         </p>
         <div className="space-y-2">
@@ -292,28 +306,29 @@ export default function SetupPage() {
             <RowShell key={index} onRemove={() => setDebts((rows) => rows.filter((_, i) => i !== index))}>
               <Input
                 placeholder="Name (must match a person above)"
+                className="bg-raised"
                 value={row.name}
                 onChange={(e) => patch(setDebts, index, { name: e.target.value })}
               />
-              <div className="grid grid-cols-3 gap-2">
-                <Select
-                  aria-label="Direction"
-                  value={row.direction}
-                  onChange={(e) => patch(setDebts, index, { direction: e.target.value })}
-                >
-                  <option value="owes_me">Owes me</option>
-                  <option value="i_owe">I owe</option>
-                </Select>
+              <Segmented
+                label="Direction"
+                options={DIRECTION_OPTIONS}
+                value={row.direction === "i_owe" ? "i_owe" : "owes_me"}
+                onChange={(direction) => patch(setDebts, index, { direction })}
+              />
+              <div className="grid grid-cols-2 gap-2">
                 <Input
                   aria-label="Amount"
                   inputMode="decimal"
                   placeholder="Amount"
+                  className="bg-raised"
                   value={row.amount}
                   onChange={(e) => patch(setDebts, index, { amount: e.target.value })}
                 />
                 <Input
                   aria-label="Due date"
                   type="date"
+                  className="bg-raised"
                   value={row.due}
                   onChange={(e) => patch(setDebts, index, { due: e.target.value })}
                 />
@@ -321,7 +336,7 @@ export default function SetupPage() {
             </RowShell>
           ))}
         </div>
-        <div className="mt-3 flex items-center gap-4">
+        <div className="mt-3 flex flex-wrap items-center gap-4">
           <Button type="button" onClick={() => setDebts((rows) => [...rows, blankDebt()])}>
             Add debt
           </Button>
@@ -342,8 +357,11 @@ export default function SetupPage() {
         </div>
       )}
 
-      <div className={cx("sticky bottom-0 -mx-4 border-t border-line bg-canvas/95 px-4 py-3 backdrop-blur")}>
-        <Button type="button" variant="primary" className="w-full" onClick={onSubmit} disabled={busy}>
+      <div
+        className="sticky bottom-0 -mx-4 bg-canvas px-4 pt-2"
+        style={{ paddingBottom: "max(12px, env(safe-area-inset-bottom))" }}
+      >
+        <Button type="button" variant="primary" className="h-14 w-full" onClick={onSubmit} disabled={busy}>
           {busy ? "Saving…" : "Save opening balances"}
         </Button>
       </div>
