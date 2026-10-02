@@ -6,7 +6,7 @@ export const metadata: Metadata = {
   title: "Finance",
   description: "Personal double-entry ledger and budget envelopes",
   manifest: "/manifest.webmanifest",
-  appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "Finance" },
+  appleWebApp: { capable: true, statusBarStyle: "black", title: "Finance" },
   icons: { icon: "/icon-192.png", apple: "/apple-touch-icon.png" },
 };
 

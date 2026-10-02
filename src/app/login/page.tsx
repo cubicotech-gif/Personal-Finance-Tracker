@@ -54,12 +54,13 @@ export default function LoginPage() {
 
   if (!isSupabaseConfigured()) {
     return (
-      <main className="mx-auto max-w-lg px-4 py-16">
+      <main className="mx-auto flex min-h-dvh max-w-lg flex-col justify-center px-4">
         <Card className="p-4">
-          <h1 className="mb-2 text-lg font-semibold">Not configured</h1>
-          <p className="text-sm text-muted">
-            Set <code className="rounded bg-canvas px-1">NEXT_PUBLIC_SUPABASE_URL</code> and{" "}
-            <code className="rounded bg-canvas px-1">NEXT_PUBLIC_SUPABASE_ANON_KEY</code>, then reload.
+          <h1 className="t-section mb-2">Not configured</h1>
+          <p className="text-muted">
+            Set <code className="rounded-lg bg-raised px-1.5 py-0.5">NEXT_PUBLIC_SUPABASE_URL</code> and{" "}
+            <code className="rounded-lg bg-raised px-1.5 py-0.5">NEXT_PUBLIC_SUPABASE_ANON_KEY</code>, then
+            reload.
           </p>
         </Card>
       </main>
@@ -67,57 +68,66 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="mx-auto max-w-lg px-4 py-16">
-      <h1 className="mb-1 text-2xl font-semibold">Finance</h1>
-      <p className="mb-6 text-sm text-muted">
-        {mode === "signin" ? "Sign in to sync this device." : "Create the account for this ledger."}
-      </p>
-
-      <form onSubmit={onSubmit} className="space-y-4">
-        <div>
-          <Label htmlFor="email">Email</Label>
-          <Input
-            id="email"
-            type="email"
-            autoComplete="email"
-            inputMode="email"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-          />
-        </div>
-        <div>
-          <Label htmlFor="password">Password</Label>
-          <Input
-            id="password"
-            type="password"
-            autoComplete={mode === "signin" ? "current-password" : "new-password"}
-            required
-            minLength={8}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
+    <main className="mx-auto flex min-h-dvh max-w-lg flex-col px-4">
+      <form onSubmit={onSubmit} className="flex flex-1 flex-col">
+        <div className="pt-20">
+          <h1 className="t-hero">Finance</h1>
+          <p className="mt-2 text-muted">
+            {mode === "signin" ? "Sign in to sync this device." : "Create the account for this ledger."}
+          </p>
         </div>
 
-        <ErrorNote>{error}</ErrorNote>
-        {notice && <p className="rounded-lg bg-accent-soft px-3 py-2 text-sm text-accent">{notice}</p>}
+        <div className="mt-10 space-y-4">
+          <div>
+            <Label htmlFor="email">Email</Label>
+            <Input
+              id="email"
+              type="email"
+              autoComplete="email"
+              inputMode="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+          </div>
+          <div>
+            <Label htmlFor="password">Password</Label>
+            <Input
+              id="password"
+              type="password"
+              autoComplete={mode === "signin" ? "current-password" : "new-password"}
+              required
+              minLength={8}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+          </div>
 
-        <Button type="submit" variant="primary" className="w-full" disabled={busy}>
-          {busy ? "Working…" : mode === "signin" ? "Sign in" : "Create account"}
-        </Button>
+          <ErrorNote>{error}</ErrorNote>
+          {notice && <p className="rounded-2xl bg-accent-soft px-4 py-3 text-accent">{notice}</p>}
+        </div>
+
+        {/* The action sits at the bottom, where the thumb already is. */}
+        <div
+          className="mt-auto space-y-1 pt-6 pb-3"
+          style={{ paddingBottom: "max(12px, env(safe-area-inset-bottom))" }}
+        >
+          <Button type="submit" variant="primary" className="h-14 w-full" disabled={busy}>
+            {busy ? "Working…" : mode === "signin" ? "Sign in" : "Create account"}
+          </Button>
+          <button
+            type="button"
+            className="min-h-11 w-full text-muted underline"
+            onClick={() => {
+              setMode(mode === "signin" ? "signup" : "signin");
+              setError(null);
+              setNotice(null);
+            }}
+          >
+            {mode === "signin" ? "Create an account instead" : "I already have an account"}
+          </button>
+        </div>
       </form>
-
-      <button
-        type="button"
-        className="mt-4 text-sm text-muted underline"
-        onClick={() => {
-          setMode(mode === "signin" ? "signup" : "signin");
-          setError(null);
-          setNotice(null);
-        }}
-      >
-        {mode === "signin" ? "Create an account instead" : "I already have an account"}
-      </button>
     </main>
   );
 }

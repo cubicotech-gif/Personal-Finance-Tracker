@@ -1,9 +1,12 @@
 "use client";
 
-import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes } from "react";
+import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode } from "react";
 
 /** Tap targets are 44px minimum throughout — this is a phone-first app. */
 const TAP = "min-h-11";
+
+/** True when the caller passed their own background, which must win over the default. */
+const hasBg = (className?: string) => Boolean(className && /(^|\s)bg-/.test(className));
 
 export function cx(...parts: (string | false | null | undefined)[]): string {
   return parts.filter(Boolean).join(" ");
@@ -66,7 +69,7 @@ export function Chip({
         "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
         selected
           ? "bg-accent text-on-accent"
-          : "bg-surface text-ink hover:bg-raised",
+          : cx("text-ink", !hasBg(className) && "bg-surface hover:bg-raised"),
         className,
       )}
     />
@@ -96,7 +99,8 @@ export function Input({ className, ...props }: InputHTMLAttributes<HTMLInputElem
       {...props}
       className={cx(
         TAP,
-        "w-full rounded-2xl bg-surface px-4 text-base",
+        "w-full rounded-2xl px-4 text-base",
+        !hasBg(className) && "bg-surface",
         "focus:outline-2 focus:outline-accent",
         className,
       )}
@@ -104,17 +108,43 @@ export function Input({ className, ...props }: InputHTMLAttributes<HTMLInputElem
   );
 }
 
-export function Select({ className, ...props }: SelectHTMLAttributes<HTMLSelectElement>) {
+/** A two- or three-way toggle, used where a native select would hide the options. */
+export function Segmented<T extends string>({
+  options,
+  value,
+  onChange,
+  label,
+  className,
+}: {
+  options: readonly { value: T; label: string }[];
+  value: T;
+  onChange: (value: T) => void;
+  label: string;
+  className?: string;
+}) {
   return (
-    <select
-      {...props}
-      className={cx(
-        TAP,
-        "w-full appearance-none rounded-2xl bg-surface px-4 text-base",
-        "focus:outline-2 focus:outline-accent",
-        className,
-      )}
-    />
+    <div
+      role="group"
+      aria-label={label}
+      className={cx("grid gap-1 rounded-2xl bg-raised p-1", className)}
+      style={{ gridTemplateColumns: `repeat(${options.length}, minmax(0, 1fr))` }}
+    >
+      {options.map((option) => (
+        <button
+          key={option.value}
+          type="button"
+          aria-pressed={value === option.value}
+          onClick={() => onChange(option.value)}
+          className={cx(
+            "min-h-11 rounded-xl px-2 text-[15px] font-medium transition-colors",
+            "focus-visible:outline-2 focus-visible:outline-accent",
+            value === option.value ? "bg-surface text-ink" : "text-muted",
+          )}
+        >
+          {option.label}
+        </button>
+      ))}
+    </div>
   );
 }
 
