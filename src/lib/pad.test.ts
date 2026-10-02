@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { padInput, type PadKey } from "./pad";
+import { minorToTyped, padInput, type PadKey } from "./pad";
 
 const press = (keys: PadKey[], from = "") => keys.reduce(padInput, from);
 
@@ -31,5 +31,15 @@ describe("padInput", () => {
 
   it("caps the whole part", () => {
     assert.equal(press(Array(20).fill("9") as PadKey[]).length, 12);
+  });
+});
+
+describe("minorToTyped", () => {
+  it("round-trips minor units into pad text", () => {
+    assert.equal(minorToTyped(125000n), "1250");
+    assert.equal(minorToTyped(125050n), "1250.5");
+    assert.equal(minorToTyped(125005n), "1250.05");
+    assert.equal(minorToTyped(5n), "0.05");
+    assert.equal(minorToTyped(0n), "0");
   });
 });

@@ -27,3 +27,14 @@ export function padInput(value: string, key: PadKey): string {
   if (value === "0") return key === "0" ? value : key;
   return value.length >= MAX_WHOLE ? value : value + key;
 }
+
+/**
+ * Minor units back to the string the pad edits, without a float: 125050n is
+ * "1250.5", 125000n is "1250". Used to pre-fill "the full amount".
+ */
+export function minorToTyped(value: bigint): string {
+  const digits = (value < 0n ? -value : value).toString().padStart(3, "0");
+  const whole = digits.slice(0, -2);
+  const frac = digits.slice(-2).replace(/0+$/, "");
+  return frac === "" ? whole : `${whole}.${frac}`;
+}

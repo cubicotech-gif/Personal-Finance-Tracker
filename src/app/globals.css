@@ -22,6 +22,7 @@
   --danger: #e5706f;
   --danger-soft: rgb(229 112 111 / 0.14);
   --warn: #d9a441;
+  --warn-soft: rgb(217 164 65 / 0.14);
   color-scheme: dark;
 }
 
@@ -38,6 +39,7 @@
   --danger: #c0392f;
   --danger-soft: rgb(192 57 47 / 0.1);
   --warn: #9a6a05;
+  --warn-soft: rgb(154 106 5 / 0.12);
   color-scheme: light;
 }
 
@@ -59,6 +61,7 @@
   --color-danger-soft: var(--danger-soft);
   --color-positive: var(--accent);
   --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
 }
 
 html {
