@@ -8,7 +8,9 @@ import type { IsoDate } from "@/lib/dates";
 import type { Snapshot } from "./snapshot";
 import { entryAmount } from "./snapshot";
 import {
+  CLIENT_FLOAT,
   EXPENSES,
+  FLOAT_RECEIVABLE,
   INCOME,
   PAYABLES,
   RECEIVABLES,
@@ -58,6 +60,7 @@ async function ensure(
   type: AccountType,
   currency: Currency,
   sortOrder: number,
+  isFloat = false,
 ): Promise<string> {
   const wanted = forCurrency(name, currency);
   const lower = wanted.toLowerCase();
@@ -71,8 +74,41 @@ async function ensure(
   const fromDb = await db.accounts.filter((account) => account.name.toLowerCase() === lower).first();
   if (fromDb) return fromDb.id;
 
-  const created = await upsertAccount({ name: wanted, type, currency, sort_order: sortOrder });
+  const created = await upsertAccount({
+    name: wanted,
+    type,
+    currency,
+    sort_order: sortOrder,
+    is_float: isFloat,
+  });
   return created.id;
+}
+
+/**
+ * Which account a debt belongs on.
+ *
+ * Money owed to a float client is not an ordinary payable — it is money being
+ * held for someone else, so it has to land on the float-flagged account or it
+ * never reaches "held for others" and the float shortfall silently understates
+ * how much of other people's money has been spent. Setup already routes this
+ * way; everyday logging has to agree with it or the two disagree over time.
+ */
+function debtAccount(
+  snapshot: Snapshot,
+  counterpartyId: string,
+  owedToMe: boolean,
+): { name: string; type: AccountType; sort: number; isFloat: boolean } {
+  const isFloatClient =
+    snapshot.counterpartiesById.get(counterpartyId)?.kind === "float_client";
+
+  if (owedToMe) {
+    return isFloatClient
+      ? { name: FLOAT_RECEIVABLE, type: "asset", sort: SORT.receivables, isFloat: true }
+      : { name: RECEIVABLES, type: "asset", sort: SORT.receivables, isFloat: false };
+  }
+  return isFloatClient
+    ? { name: CLIENT_FLOAT, type: "liability", sort: SORT.payables, isFloat: true }
+    : { name: PAYABLES, type: "liability", sort: SORT.payables, isFloat: false };
 }
 
 function accountOrThrow(snapshot: Snapshot, id: string): AccountRow {
@@ -113,29 +149,37 @@ export async function composeEntries(snapshot: Snapshot, draft: LogDraft): Promi
         draft.incomeAccountId ?? (await ensure(snapshot, INCOME, "income", currency, SORT.income));
       break;
 
-    case "lend":
+    case "lend": {
       // Money out that I expect back: it stays an asset, just a different one.
-      contraId = await ensure(snapshot, RECEIVABLES, "asset", currency, SORT.receivables);
       contraCounterparty = requireCounterparty(draft);
+      const target = debtAccount(snapshot, contraCounterparty, true);
+      contraId = await ensure(snapshot, target.name, target.type, currency, target.sort, target.isFloat);
       dueOn = draft.dueOn ?? null;
       break;
+    }
 
-    case "borrow":
-      contraId = await ensure(snapshot, PAYABLES, "liability", currency, SORT.payables);
+    case "borrow": {
       contraCounterparty = requireCounterparty(draft);
+      const target = debtAccount(snapshot, contraCounterparty, false);
+      contraId = await ensure(snapshot, target.name, target.type, currency, target.sort, target.isFloat);
       dueOn = draft.dueOn ?? null;
       break;
+    }
 
-    case "repay_debt":
+    case "repay_debt": {
       // Paying down what I owe: the liability shrinks, no expense is incurred.
-      contraId = await ensure(snapshot, PAYABLES, "liability", currency, SORT.payables);
       contraCounterparty = requireCounterparty(draft);
+      const target = debtAccount(snapshot, contraCounterparty, false);
+      contraId = await ensure(snapshot, target.name, target.type, currency, target.sort, target.isFloat);
       break;
+    }
 
-    case "receive_repayment":
-      contraId = await ensure(snapshot, RECEIVABLES, "asset", currency, SORT.receivables);
+    case "receive_repayment": {
       contraCounterparty = requireCounterparty(draft);
+      const target = debtAccount(snapshot, contraCounterparty, true);
+      contraId = await ensure(snapshot, target.name, target.type, currency, target.sort, target.isFloat);
       break;
+    }
   }
 
   const contraLeg: EntryDraft = {
@@ -224,8 +268,8 @@ export function decompose(snapshot: Snapshot, transactionId: string): LogDraft |
 
   const classify = (name: string): "receivable" | "payable" | null => {
     const base = baseName(name);
-    if (base === RECEIVABLES.toLowerCase()) return "receivable";
-    if (base === PAYABLES.toLowerCase()) return "payable";
+    if (base === RECEIVABLES.toLowerCase() || base === FLOAT_RECEIVABLE.toLowerCase()) return "receivable";
+    if (base === PAYABLES.toLowerCase() || base === CLIENT_FLOAT.toLowerCase()) return "payable";
     return null;
   };
 
@@ -286,7 +330,7 @@ export function accountsByUsage(snapshot: Snapshot): AccountRow[] {
         (account.type === "asset" || account.type === "liability") &&
         // Receivables and payables are reached through a counterparty, not by
         // picking them as "the account the money came out of".
-        !/^(receivables|payables)(\s|$)/i.test(account.name),
+        !/^(receivables|payables|client float|float receivable)(\s|$)/i.test(account.name),
     )
     .sort((a, b) => (counts.get(b.id) ?? 0) - (counts.get(a.id) ?? 0) || a.name.localeCompare(b.name));
 }
