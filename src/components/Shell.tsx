@@ -119,19 +119,32 @@ export function Shell({ title, children }: { title: string; children: ReactNode 
  * screen it cannot verify.
  */
 export function Guard({ children }: { children: ReactNode }) {
-  const { auth } = useApp();
+  const { auth, syncedOnce, online } = useApp();
   const snapshot = useSnapshot();
   const router = useRouter();
 
-  const needsSetup = snapshot.ready && snapshot.accounts.length === 0;
+  /**
+   * An empty local database right after signing in means the download has not
+   * run yet, NOT that there is nothing to download — Dexie answers instantly
+   * while the pull is still in flight. Sending someone to /setup on that basis
+   * invites them to enter their opening balances a second time, which silently
+   * doubles every figure. So wait for one completed sync before concluding
+   * that setup is needed.
+   */
+  const waitingForFirstSync = auth === "signed-in" && !syncedOnce && snapshot.accounts.length === 0;
+  const needsSetup = snapshot.ready && !waitingForFirstSync && snapshot.accounts.length === 0;
 
   useEffect(() => {
     if (auth === "signed-out") router.replace("/login");
     else if (auth === "signed-in" && needsSetup) router.replace("/setup");
   }, [auth, needsSetup, router]);
 
-  if (auth === "loading" || !snapshot.ready) {
-    return <p className="px-4 py-10 text-center text-muted">Loading…</p>;
+  if (auth === "loading" || !snapshot.ready || waitingForFirstSync) {
+    return (
+      <p className="px-4 py-10 text-center text-muted">
+        {waitingForFirstSync && !online ? "Offline — waiting to load your data…" : "Loading…"}
+      </p>
+    );
   }
   if (auth === "signed-out" || needsSetup) return null;
 

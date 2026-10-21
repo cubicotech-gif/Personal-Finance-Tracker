@@ -290,6 +290,8 @@ describe("composeEntries", () => {
     account("inc", "Salary", "income"),
     account("recv", "Receivables", "asset"),
     account("pay", "Payables", "liability"),
+    account("cfloat", "Client float", "liability"),
+    account("frecv", "Float receivable", "asset"),
   ];
   const snapshot = buildSnapshot({
     accounts,
@@ -327,6 +329,42 @@ describe("composeEntries", () => {
     const contra = entries.find((e) => e.account_id === "recv");
     assert.equal(contra?.amount_minor, 5_000n);
     assert.equal(contra?.counterparty_id, "ali");
+  });
+
+  it("sends a float client's money to held-for-others, not to payables", async () => {
+    // The case this app exists for: a client's money arriving. Booking it as an
+    // ordinary payable would leave "held for others" and the float shortfall
+    // understated, which is the one number the whole design is pointed at.
+    const withClient = buildSnapshot({
+      accounts,
+      counterparties: [counterparty("ali", "Ali"), counterparty("bilal", "Bilal Traders", "float_client")],
+      categories: [category("groceries", "Groceries")],
+    });
+
+    const incoming = await composeEntries(withClient, {
+      bookedOn: "2026-10-21",
+      direction: "in",
+      kind: "borrow",
+      amount: 10_000_000n,
+      accountId: "cash",
+      counterpartyId: "bilal",
+    });
+    const held = incoming.find((e) => e.account_id !== "cash");
+    assert.equal(incoming.reduce((t, e) => t + e.amount_minor, 0n), 0n);
+    assert.equal(held?.counterparty_id, "bilal");
+    assert.equal(held?.account_id, "cfloat", "a client's money is held for others");
+    assert.notEqual(held?.account_id, "pay", "must not land on ordinary Payables");
+
+    // An ordinary person borrowing is still a plain payable.
+    const fromPerson = await composeEntries(withClient, {
+      bookedOn: "2026-10-21",
+      direction: "in",
+      kind: "borrow",
+      amount: 5_000n,
+      accountId: "cash",
+      counterpartyId: "ali",
+    });
+    assert.equal(fromPerson.find((e) => e.account_id !== "cash")?.account_id, "pay");
   });
 
   it("refuses a loan with nobody attached to it", async () => {
