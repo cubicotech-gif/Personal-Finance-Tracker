@@ -114,6 +114,14 @@ src/lib/setup.ts       opening balances and spreadsheet paste
 src/app/               login, setup, log, accounts, people, boxes
 ```
 
+## Starting over
+
+If the app has gone unused long enough that every balance is stale, there is
+nothing to reconcile against — re-baseline instead of trying to patch it.
+`supabase/reset.sql` clears the ledger; sign out and back in, and the app walks
+you through `/setup` again. The file explains why re-running setup or using
+Reconcile does not work for this.
+
 ## Notes
 
 The service worker does its own precaching rather than using Serwist's
