@@ -138,6 +138,7 @@ export default function SetupPage() {
   );
 
   const usesUsd = accounts.some((row) => row.currency === "USD");
+  const alreadySetUp = snapshot.ready && snapshot.accounts.length > 0;
 
   function patch<T>(setter: (fn: (rows: T[]) => T[]) => void, index: number, change: Partial<T>) {
     setter((rows) => rows.map((row, i) => (i === index ? { ...row, ...change } : row)));
@@ -162,10 +163,27 @@ export default function SetupPage() {
   return (
     <main className="mx-auto max-w-lg px-4 pt-8">
       <h1 className="t-section">Opening balances</h1>
-      <p className="mt-2 mb-6 text-muted">
+      <p className="mt-2 mb-4 text-muted">
         Everything below is written as one balanced transaction against Equity:Opening, dated the as-of
         date. You can re-run this later to add accounts; existing ones are matched by name.
       </p>
+
+      {/*
+        Saving adds an opening transaction, it never replaces the previous one.
+        Re-entering the same balances therefore doubles every figure, and the
+        result looks plausible rather than broken — so say so before it happens,
+        not in a help page afterwards.
+      */}
+      {alreadySetUp && (
+        <div
+          role="alert"
+          className="mb-6 rounded-xl border border-danger/40 bg-danger-soft px-3 py-2.5 text-sm text-danger"
+        >
+          <strong className="block font-semibold">You already have {snapshot.accounts.length} accounts.</strong>
+          Saving <em>adds</em> to what is already there — it does not replace it. Re-entering balances
+          you have entered before will double them. Only add rows that are genuinely new.
+        </div>
+      )}
 
       <div className="mb-8 grid grid-cols-2 gap-3">
         <div>

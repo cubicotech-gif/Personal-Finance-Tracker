@@ -27,6 +27,11 @@ interface AppContextValue {
   /** Writes waiting to reach the server. */
   pending: number;
   lastSyncedAt: string | null;
+  /**
+   * True once a pull has finished at least once this session. Until then an
+   * empty local database means "not downloaded yet", not "nothing exists".
+   */
+  syncedOnce: boolean;
   /** Set when an op cannot be replayed and the queue is stuck. */
   blockedError: string | null;
   sync: () => Promise<void>;
@@ -43,6 +48,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [online, setOnline] = useState(true);
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
+  const [syncedOnce, setSyncedOnce] = useState(false);
   const [blockedError, setBlockedError] = useState<string | null>(null);
 
   // One sync at a time. Without this, the outbox-changed effect and the poll
@@ -113,6 +119,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const result = await syncNow();
       setBlockedError(result.blocked?.last_error ?? null);
       setLastSyncedAt(new Date().toISOString());
+      setSyncedOnce(true);
     } catch (error) {
       // Offline or a transient server error. The outbox keeps the write, so
       // this is not something to interrupt the user about.
@@ -159,6 +166,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     await supabase().auth.signOut();
     await clearLocalData();
     setCurrentUser(null);
+    setSyncedOnce(false);
   }, [sync]);
 
   const value = useMemo<AppContextValue>(
@@ -169,11 +177,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
       online,
       pending,
       lastSyncedAt,
+      syncedOnce,
       blockedError,
       sync,
       signOut,
     }),
-    [auth, userId, session, online, pending, lastSyncedAt, blockedError, sync, signOut],
+    [auth, userId, session, online, pending, lastSyncedAt, syncedOnce, blockedError, sync, signOut],
   );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
