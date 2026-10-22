@@ -3,11 +3,11 @@
 import Link from "next/link";
 import { useCallback, useMemo, useState } from "react";
 import { IconPlus } from "@tabler/icons-react";
-import { Money, MoneyWithPkr } from "@/components/Money";
+import { Money } from "@/components/Money";
 import { PullToRefresh } from "@/components/PullToRefresh";
 import { TABBAR } from "@/components/Shell";
 import { Button, Card, Empty, ErrorNote, Input, SectionTitle, cx } from "@/components/ui";
-import { rateMissing, useSnapshot } from "@/lib/ledger/snapshot";
+import { useSnapshot } from "@/lib/ledger/snapshot";
 import {
   GROUP_LABEL,
   GROUP_ORDER,
@@ -16,10 +16,10 @@ import {
   netWorthChange,
   realMoneyAccounts,
   summarise,
-  type AccountBalance,
 } from "@/lib/ledger/accounts";
 import { upsertRate } from "@/lib/db/mutations";
 import { HomeSections } from "./HomeSections";
+import { WalletStrip } from "./WalletStrip";
 import { useApp } from "@/lib/sync/provider";
 import { formatAmount } from "@/lib/format";
 import { formatRate, parseRate, type Minor } from "@/lib/money";
@@ -95,8 +95,13 @@ export function AccountsScreen() {
           */}
           <div className="flex flex-col gap-6 pb-6 lg:grid lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start">
             <div className="space-y-6 lg:col-start-1 lg:row-start-1">
-            {/* Hero ----------------------------------------------------- */}
-            <section>
+            {/* Hero ------------------------------------------------------
+                The headline and the two figures that qualify it belong to one
+                another, so they share a card: the big number says where you
+                stand, the pair underneath says how much of it is actually
+                yours. Split across separate blocks they read as three
+                unrelated statistics. */}
+            <section className="rounded-2xl bg-surface p-4">
               <p className="t-label text-muted">Net worth</p>
               <Money
                 amount={summary.netWorth}
@@ -118,14 +123,25 @@ export function AccountsScreen() {
                   "Nothing to compare with yet"
                 )}
               </p>
+
+              <div className="mt-4 grid grid-cols-2 gap-3 border-t border-line pt-3">
+                <div>
+                  <p className="t-label text-muted">Mine</p>
+                  <Money amount={summary.mine} tone="auto" className="mt-0.5 block font-semibold" />
+                  <p className="t-label text-muted">free to spend</p>
+                </div>
+                <div>
+                  <p className="t-label text-muted">Held for others</p>
+                  <Money amount={summary.heldForOthers} tone="plain" className="mt-0.5 block font-semibold" />
+                  <p className="t-label text-muted">float owed to clients</p>
+                </div>
+              </div>
             </section>
 
-            {/* Stats ---------------------------------------------------- */}
-            <section className="grid grid-cols-2 gap-2">
-              <StatTile label="Mine" hint="free to spend" amount={summary.mine} tone="auto" />
-              <StatTile label="Held for others" hint="float owed to clients" amount={summary.heldForOthers} />
+            {/* The shortfall is a warning, not a statistic — it keeps its own
+                card so it can shout when it needs to. */}
+            <section>
               <StatTile
-                className="col-span-2"
                 label="Float shortfall"
                 hint={shortfall ? "float money already spent. Must be returned." : "float is fully backed"}
                 amount={summary.floatShortfall}
@@ -151,7 +167,7 @@ export function AccountsScreen() {
               groups.map(({ group, rows: groupRows }) => (
                 <section key={group}>
                   <SectionTitle>{GROUP_LABEL[group]}</SectionTitle>
-                  <AccountList rows={groupRows} />
+                  <WalletStrip rows={groupRows} />
                 </section>
               ))
             )}
@@ -176,53 +192,6 @@ export function AccountsScreen() {
         </Link>
       </div>
     </div>
-  );
-}
-
-function AccountList({ rows }: { rows: AccountBalance[] }) {
-  const snapshot = useSnapshot();
-  return (
-    <ul className="space-y-1">
-      {rows.map(({ account, native, pkr, currency }) => {
-        const liability = account.type === "liability";
-        return (
-          <li key={account.id} className="flex min-h-16 items-center justify-between gap-3 rounded-2xl bg-surface px-4 py-3">
-            <div className="min-w-0">
-              <p className="flex items-center gap-2">
-                <span className="truncate font-medium">{account.name}</span>
-                {currency !== "PKR" && (
-                  <span className="t-label shrink-0 rounded-full bg-raised px-2 py-0.5 text-muted">{currency}</span>
-                )}
-              </p>
-              {(liability || account.archived) && (
-                <p className={cx("text-xs", liability ? "text-danger" : "text-muted")}>
-                  {liability ? "owed" : ""}
-                  {liability && account.archived ? " · " : ""}
-                  {account.archived ? "archived" : ""}
-                </p>
-              )}
-            </div>
-            {currency === "PKR" ? (
-              // Liabilities read as credit balances; show what is owed, positively.
-              <Money
-                amount={liability ? -native : native}
-                currency={currency}
-                tone={liability ? "danger" : "plain"}
-                className="shrink-0 font-medium"
-              />
-            ) : (
-              <MoneyWithPkr
-                amount={liability ? -native : native}
-                currency={currency}
-                pkr={liability ? -pkr : pkr}
-                rateMissing={rateMissing(snapshot, currency)}
-                className="shrink-0 font-medium"
-              />
-            )}
-          </li>
-        );
-      })}
-    </ul>
   );
 }
 

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { IconPlus } from "@tabler/icons-react";
 import { Money } from "@/components/Money";
 import { Sheet } from "@/components/Sheet";
@@ -34,7 +35,26 @@ export function PeopleScreen() {
   const open = useCallback((position: DebtPosition) => {
     setSheet((current) => ({ position, session: current.session + 1, open: true }));
   }, []);
-  const close = useCallback(() => setSheet((current) => ({ ...current, open: false })), []);
+  // Home links here with ?person=<id> so a tapped face lands on that person
+  // rather than on the list they are somewhere in.
+  const requested = useSearchParams().get("person");
+  const [dismissedLink, setDismissedLink] = useState(false);
+
+  const close = useCallback(() => {
+    setSheet((current) => ({ ...current, open: false }));
+    // Closing has to override the link that opened it, or the sheet springs
+    // back while ?person= is still in the URL.
+    setDismissedLink(true);
+  }, []);
+
+  const linked = useMemo(
+    () => (requested ? (positions.find((p) => p.counterparty.id === requested) ?? null) : null),
+    [requested, positions],
+  );
+  // Derived, not pushed into state on arrival: the sheet is open because the
+  // link says so, until it is closed.
+  const sheetPosition = sheet.open ? sheet.position : (dismissedLink ? null : linked);
+  const sheetOpen = sheet.open || (linked !== null && !dismissedLink);
 
   const nobody =
     positions.length === 0 ||
@@ -134,8 +154,14 @@ export function PeopleScreen() {
         </Link>
       </div>
 
-      <Sheet open={sheet.open} onClose={close} label="Person">
-        {sheet.position && <PersonSheetBody key={sheet.session} position={sheet.position} onDone={close} />}
+      <Sheet open={sheetOpen} onClose={close} label="Person">
+        {sheetPosition && (
+          <PersonSheetBody
+            key={`${sheet.session}:${sheetPosition.counterparty.id}`}
+            position={sheetPosition}
+            onDone={close}
+          />
+        )}
       </Sheet>
     </div>
   );

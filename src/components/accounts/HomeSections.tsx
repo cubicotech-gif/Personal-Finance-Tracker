@@ -7,8 +7,8 @@ import { Card, SectionTitle, cx } from "@/components/ui";
 import { useSnapshot } from "@/lib/ledger/snapshot";
 import { buildHome, type DueItem } from "@/lib/ledger/home";
 import { BalanceCheck } from "./BalanceCheck";
+import { ChaseAvatars } from "./ChaseAvatars";
 import { formatDay } from "@/lib/dates";
-import type { DebtPosition } from "@/lib/ledger/people";
 
 /**
  * The part of the home screen that answers "what do I have to do about it".
@@ -50,11 +50,7 @@ export function HomeSections() {
           >
             Chase — owed to you
           </SectionTitle>
-          <Card className="divide-y divide-line">
-            {home.chase.slice(0, 4).map((position) => (
-              <ChaseRow key={position.counterparty.id} position={position} />
-            ))}
-          </Card>
+          <ChaseAvatars positions={home.chase} />
         </section>
       )}
 
@@ -104,22 +100,6 @@ function DueRow({ item }: { item: DueItem }) {
         tone={overdue ? "danger" : "plain"}
         className="shrink-0 font-semibold"
       />
-    </div>
-  );
-}
-
-function ChaseRow({ position }: { position: DebtPosition }) {
-  return (
-    <div className="flex items-center justify-between gap-3 px-4 py-3">
-      <div className="min-w-0">
-        <p className="truncate font-medium">{position.counterparty.name}</p>
-        <p className="t-label text-muted">
-          {position.daysOutstanding === null
-            ? "no date"
-            : `${position.daysOutstanding} day${position.daysOutstanding === 1 ? "" : "s"} outstanding`}
-        </p>
-      </div>
-      <Money amount={position.amountPkr} compact tone="plain" className="shrink-0 font-semibold" />
     </div>
   );
 }
