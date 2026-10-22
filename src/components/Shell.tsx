@@ -10,7 +10,7 @@ import { ThemeToggle } from "./ThemeToggle";
 import { cx } from "./ui";
 
 const TABS = [
-  { href: "/accounts", label: "Accounts", icon: IconWallet },
+  { href: "/accounts", label: "Home", icon: IconWallet },
   { href: "/log", label: "Log", icon: IconPlus },
   { href: "/boxes", label: "Boxes", icon: IconLayoutGrid },
   { href: "/people", label: "People", icon: IconUsers },

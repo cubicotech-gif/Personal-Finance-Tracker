@@ -6,7 +6,7 @@ import { AccountsScreen } from "@/components/accounts/AccountsScreen";
 export default function AccountsPage() {
   return (
     <Guard>
-      <Shell title="Accounts">
+      <Shell title="Home">
         <AccountsScreen />
       </Shell>
     </Guard>

@@ -19,6 +19,7 @@ import {
   type AccountBalance,
 } from "@/lib/ledger/accounts";
 import { upsertRate } from "@/lib/db/mutations";
+import { HomeSections } from "./HomeSections";
 import { useApp } from "@/lib/sync/provider";
 import { formatAmount } from "@/lib/format";
 import { formatRate, parseRate, type Minor } from "@/lib/money";
@@ -124,6 +125,9 @@ export function AccountsScreen() {
                 alert={shortfall}
               />
             </section>
+
+            {/* What happens next: due dates, the chase list, this month. */}
+            <HomeSections />
 
             {hasUsd && <RateCard />}
 
