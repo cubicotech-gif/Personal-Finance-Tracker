@@ -46,6 +46,21 @@
 /* Phones with little height (an SE, a browser with chrome) get tighter controls. */
 @custom-variant short (@media (max-height: 720px));
 
+/*
+ * Height of the bottom tab bar. Pinned actions and bottom padding are measured
+ * against it, so collapsing it to zero on desktop — where navigation is a
+ * sidebar instead — moves everything that depends on it in one go.
+ */
+:root {
+  --tabbar: calc(64px + env(safe-area-inset-bottom));
+}
+
+@media (min-width: 64rem) {
+  :root {
+    --tabbar: 0px;
+  }
+}
+
 @theme inline {
   --font-sans: "Manrope Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --color-canvas: var(--canvas);

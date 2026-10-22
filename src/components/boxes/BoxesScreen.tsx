@@ -105,13 +105,13 @@ export function BoxesScreen() {
       {/* Primary action, under the thumb -------------------------------- */}
       {canAct && (
         <div
-          className="sticky z-10 -mx-4 bg-canvas px-4 pt-2 pb-3"
+          className="sticky z-10 -mx-4 bg-canvas px-4 pt-2 pb-3 lg:static lg:mx-0 lg:px-0 lg:pb-0"
           style={{ bottom: TABBAR, minHeight: ACTION_H }}
         >
           <button
             type="button"
             onClick={() => open(null)}
-            className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-accent font-medium text-on-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-accent font-medium text-on-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent lg:h-11 lg:w-fit lg:rounded-xl lg:px-6"
           >
             <IconCoin size={20} stroke={2} aria-hidden />
             Assign money

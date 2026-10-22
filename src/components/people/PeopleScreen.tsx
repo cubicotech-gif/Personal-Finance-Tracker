@@ -93,7 +93,10 @@ export function PeopleScreen() {
         {mine.length === 0 ? (
           <Empty>{tab === "owesMe" ? "Nobody owes you." : "You owe nobody."}</Empty>
         ) : (
-          <ul className="space-y-1" aria-label={tab === "owesMe" ? "People who owe you" : "People you owe"}>
+          <ul
+            className="space-y-1 lg:grid lg:grid-cols-2 lg:gap-x-3 lg:gap-y-1 lg:space-y-0"
+            aria-label={tab === "owesMe" ? "People who owe you" : "People you owe"}
+          >
             {mine.map((position) => (
               <PersonRow key={position.counterparty.id} position={position} onOpen={open} />
             ))}
@@ -108,7 +111,7 @@ export function PeopleScreen() {
             >
               {tab === "owesMe" ? "Float clients owe me" : "Holding for float clients"}
             </SectionTitle>
-            <ul className="space-y-1">
+            <ul className="space-y-1 lg:grid lg:grid-cols-2 lg:gap-x-3 lg:gap-y-1 lg:space-y-0">
               {clients.map((position) => (
                 <PersonRow key={position.counterparty.id} position={position} onOpen={open} />
               ))}
@@ -119,12 +122,12 @@ export function PeopleScreen() {
 
       {/* Primary action, under the thumb -------------------------------- */}
       <div
-        className="sticky z-10 -mx-4 bg-canvas px-4 pt-2 pb-3"
+        className="sticky z-10 -mx-4 bg-canvas px-4 pt-2 pb-3 lg:static lg:mx-0 lg:px-0 lg:pb-0"
         style={{ bottom: TABBAR, minHeight: ACTION_H }}
       >
         <Link
           href="/log"
-          className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-accent font-medium text-on-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+          className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-accent font-medium text-on-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent lg:h-11 lg:w-fit lg:rounded-xl lg:px-6"
         >
           <IconPlus size={20} stroke={2} aria-hidden />
           Lend or borrow

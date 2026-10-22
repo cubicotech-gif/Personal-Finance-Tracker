@@ -260,11 +260,18 @@ export function LogScreen() {
   const empty = form.amount === "";
 
   return (
-    <div className="space-y-6 pb-6">
+    /*
+      One column on a phone. From `lg` the entry surface stops stretching —
+      a number pad the width of a laptop is absurd, and amounts can be typed
+      anyway (usePadKeyboard) — so it keeps a thumb-sized column and the
+      recent list moves alongside it instead of below the fold.
+    */
+    <div className="space-y-6 pb-6 lg:grid lg:grid-cols-[minmax(0,26rem)_minmax(0,1fr)] lg:items-start lg:gap-8 lg:space-y-0">
+      <div className="space-y-3 lg:col-start-1">
       {/* The whole entry surface fits one screen: the pad takes whatever
           height the controls above it leave, so no key is ever below the fold. */}
       <div
-        className="flex flex-col gap-3 short:gap-2"
+        className="flex flex-col gap-3 short:gap-2 lg:min-h-0"
         style={{ minHeight: `calc(100dvh - 48px - ${TABBAR} - ${SAVE_H + 8}px)` }}
       >
         {/* Amount -------------------------------------------------------- */}
@@ -456,7 +463,7 @@ export function LogScreen() {
 
       {/* Save, pinned under the thumb ------------------------------------ */}
       <div
-        className="sticky z-10 -mx-4 bg-canvas px-4 pt-2 pb-3"
+        className="sticky z-10 -mx-4 bg-canvas px-4 pt-2 pb-3 lg:static lg:mx-0 lg:px-0 lg:pb-0"
         style={{ bottom: TABBAR, minHeight: SAVE_H }}
       >
         <button
@@ -475,9 +482,10 @@ export function LogScreen() {
 
       {/* Reconcile ------------------------------------------------------- */}
       <Reconcile open={reconciling} onOpenChange={setReconciling} />
+      </div>
 
       {/* Recent ---------------------------------------------------------- */}
-      <section>
+      <section className="lg:col-start-2">
         <SectionTitle>Recent</SectionTitle>
         {rows.length === 0 ? (
           <Empty>Nothing logged yet.</Empty>

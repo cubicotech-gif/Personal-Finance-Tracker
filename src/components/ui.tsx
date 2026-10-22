@@ -79,7 +79,13 @@ export function Chip({
 /** A horizontally scrolling chip row — faster to hit than a native select. */
 export function ChipRow({ children, label }: { children: ReactNode; label: string }) {
   return (
-    <div role="group" aria-label={label} className="no-scrollbar -mx-4 overflow-x-auto px-4">
+    /*
+      The negative margin lets a scrolling row bleed to the screen edge on a
+      phone, so a half-visible chip signals there is more to scroll. Inside a
+      desktop column there is no screen edge to reach, and the bleed just
+      spills a clipped chip past the column, so it is dropped from `lg` up.
+    */
+    <div role="group" aria-label={label} className="no-scrollbar -mx-4 overflow-x-auto px-4 lg:mx-0 lg:px-0">
       <div className="flex gap-2 pb-1">{children}</div>
     </div>
   );

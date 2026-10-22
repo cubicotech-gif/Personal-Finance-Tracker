@@ -50,30 +50,81 @@ function SyncStatus() {
   );
 }
 
-/** Height of the tab bar, shared with anything that has to sit above it. */
-export const TABBAR = "calc(64px + env(safe-area-inset-bottom))";
+/**
+ * Height of the tab bar, shared with anything that has to sit above it.
+ * Defined in CSS so it can collapse to zero on desktop, where the tab bar is
+ * replaced by the sidebar — every pinned action follows automatically.
+ */
+export const TABBAR = "var(--tabbar)";
+
+/**
+ * Navigation as a sidebar, from `lg` up.
+ *
+ * The phone layout is a 512px column, which on a laptop leaves most of the
+ * screen empty and forces scrolling past things that would otherwise fit side
+ * by side. Above `lg` the tab bar becomes a sidebar and the content area
+ * widens; below it, nothing changes.
+ */
+function Sidebar({ pathname }: { pathname: string }) {
+  return (
+    <aside className="sticky top-0 hidden h-dvh w-56 shrink-0 flex-col border-r border-line px-3 py-4 lg:flex">
+      <p className="px-3 pb-4 text-lg font-semibold">Finance</p>
+
+      <nav className="flex flex-col gap-1">
+        {TABS.map((tab) => {
+          const active = pathname === tab.href;
+          const Icon = tab.icon;
+          return (
+            <Link
+              key={tab.href}
+              href={tab.href}
+              aria-current={active ? "page" : undefined}
+              className={cx(
+                "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors",
+                active ? "bg-raised font-medium text-ink" : "text-muted hover:bg-raised/60 hover:text-ink",
+              )}
+            >
+              <Icon size={20} stroke={active ? 2 : 1.5} />
+              {tab.label}
+            </Link>
+          );
+        })}
+      </nav>
+
+      <div className="mt-auto flex items-center justify-between px-3">
+        <SyncStatus />
+        <ThemeToggle />
+      </div>
+    </aside>
+  );
+}
 
 export function Shell({ title, children }: { title: string; children: ReactNode }) {
   const pathname = usePathname();
 
   return (
-    <div className="mx-auto flex min-h-dvh w-full max-w-lg flex-col">
-      <header className="flex h-12 items-center justify-between px-4">
-        <h1 className="t-label text-muted">{title}</h1>
-        <div className="flex items-center gap-1">
-          <SyncStatus />
-          <ThemeToggle />
-        </div>
-      </header>
+    <div className="lg:flex">
+      <Sidebar pathname={pathname} />
 
-      <main className="flex-1 px-4" style={{ paddingBottom: TABBAR }}>
-        {children}
-      </main>
+      <div className="mx-auto flex min-h-dvh w-full max-w-lg flex-col lg:max-w-5xl lg:px-6">
+        {/* The sidebar carries the title and status on desktop. */}
+        <header className="flex h-12 items-center justify-between px-4 lg:hidden">
+          <h1 className="t-label text-muted">{title}</h1>
+          <div className="flex items-center gap-1">
+            <SyncStatus />
+            <ThemeToggle />
+          </div>
+        </header>
 
-      <nav
-        className="fixed inset-x-0 bottom-0 z-20 mx-auto grid max-w-lg grid-cols-4 bg-surface"
-        style={{ height: TABBAR, paddingBottom: "env(safe-area-inset-bottom)" }}
-      >
+        <main className="flex-1 px-4 pb-[var(--tabbar)] lg:px-0 lg:pt-6 lg:pb-10">{children}</main>
+
+        <nav
+          className="fixed inset-x-0 bottom-0 z-20 mx-auto grid max-w-lg grid-cols-4 bg-surface lg:hidden"
+          style={{
+            height: "calc(64px + env(safe-area-inset-bottom))",
+            paddingBottom: "env(safe-area-inset-bottom)",
+          }}
+        >
         {TABS.map((tab) => {
           const active = pathname === tab.href;
           const centre = tab.href === "/log";
@@ -106,7 +157,8 @@ export function Shell({ title, children }: { title: string; children: ReactNode 
             </Link>
           );
         })}
-      </nav>
+        </nav>
+      </div>
     </div>
   );
 }

@@ -86,7 +86,15 @@ export function AccountsScreen() {
     <div className="flex flex-col" style={{ minHeight: `calc(100dvh - 48px - ${TABBAR})` }}>
       <div className="flex-1">
         <PullToRefresh onRefresh={refresh}>
-          <div className="space-y-6 pb-6">
+          {/*
+            One column on a phone, two from `lg` up. Placement is explicit so
+            the reading order is right in both: on a phone the sections simply
+            stack in order, while on a desktop the balances and account list
+            take the main column and what-happens-next sits beside them, with
+            no duplicated markup and no scrolling past accounts to reach it.
+          */}
+          <div className="flex flex-col gap-6 pb-6 lg:grid lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start">
+            <div className="space-y-6 lg:col-start-1 lg:row-start-1">
             {/* Hero ----------------------------------------------------- */}
             <section>
               <p className="t-label text-muted">Net worth</p>
@@ -126,9 +134,14 @@ export function AccountsScreen() {
               />
             </section>
 
-            {/* What happens next: due dates, the chase list, this month. */}
-            <HomeSections />
+            </div>
 
+            {/* What happens next: due dates, the chase list, this month. */}
+            <div className="space-y-6 lg:col-start-2 lg:row-start-1 lg:row-span-2">
+              <HomeSections />
+            </div>
+
+            <div className="space-y-6 lg:col-start-1 lg:row-start-2">
             {hasUsd && <RateCard />}
 
             {/* Accounts, by kind ---------------------------------------- */}
@@ -144,18 +157,19 @@ export function AccountsScreen() {
             )}
 
             <SignOut />
+            </div>
           </div>
         </PullToRefresh>
       </div>
 
       {/* Primary action, under the thumb -------------------------------- */}
       <div
-        className="sticky z-10 -mx-4 bg-canvas px-4 pt-2 pb-3"
+        className="sticky z-10 -mx-4 bg-canvas px-4 pt-2 pb-3 lg:static lg:mx-0 lg:px-0 lg:pb-0"
         style={{ bottom: TABBAR, minHeight: ACTION_H }}
       >
         <Link
           href="/setup"
-          className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-accent font-medium text-on-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+          className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-accent font-medium text-on-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent lg:h-11 lg:w-fit lg:rounded-xl lg:px-6"
         >
           <IconPlus size={20} stroke={2} aria-hidden />
           Add account
