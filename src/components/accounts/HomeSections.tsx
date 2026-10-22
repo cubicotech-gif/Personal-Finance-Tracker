@@ -6,6 +6,7 @@ import { Money } from "@/components/Money";
 import { Card, SectionTitle, cx } from "@/components/ui";
 import { useSnapshot } from "@/lib/ledger/snapshot";
 import { buildHome, type DueItem } from "@/lib/ledger/home";
+import { BalanceCheck } from "./BalanceCheck";
 import { formatDay } from "@/lib/dates";
 import type { DebtPosition } from "@/lib/ledger/people";
 
@@ -25,6 +26,8 @@ export function HomeSections() {
 
   return (
     <>
+      <BalanceCheck />
+
       {home.dueSoon.length > 0 && (
         <section>
           <SectionTitle>Due soon</SectionTitle>

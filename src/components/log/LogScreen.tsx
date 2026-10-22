@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { IconChevronDown } from "@tabler/icons-react";
 import { CategoryIcon, SourceIcon } from "@/components/CategoryIcon";
@@ -93,7 +94,11 @@ export function LogScreen() {
   const [form, setForm] = useState<FormState>(initialForm);
   const [showMore, setShowMore] = useState(false);
   const [saving, setSaving] = useState(false);
+  // /accounts links here with ?check=<id> to open a specific account's check.
+  const requestedCheck = useSearchParams().get("check");
+  const [dismissedCheck, setDismissedCheck] = useState(false);
   const [reconciling, setReconciling] = useState(false);
+  const checking = reconciling || (Boolean(requestedCheck) && !dismissedCheck);
   const [toast, setToast] = useState<ToastState | null>(null);
   // When editing, the old amount is already counted in the box's balance, so
   // the live "left" figure has to add it back before subtracting the new one.
@@ -481,7 +486,16 @@ export function LogScreen() {
       </div>
 
       {/* Reconcile ------------------------------------------------------- */}
-      <Reconcile open={reconciling} onOpenChange={setReconciling} />
+      <Reconcile
+        open={checking}
+        accountId={requestedCheck ?? undefined}
+        onOpenChange={(next) => {
+          setReconciling(next);
+          // Closing has to override the link that opened it, or the panel
+          // springs straight back while ?check= is still in the URL.
+          if (!next) setDismissedCheck(true);
+        }}
+      />
       </div>
 
       {/* Recent ---------------------------------------------------------- */}

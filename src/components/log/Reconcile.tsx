@@ -5,6 +5,8 @@ import { Button, Card, Chip, ChipRow, ErrorNote, Input, SectionTitle } from "@/c
 import { useSnapshot } from "@/lib/ledger/snapshot";
 import { postTransaction } from "@/lib/db/mutations";
 import { accountsByUsage, composeReconcile } from "@/lib/ledger/compose";
+import { RECONCILE_PAYEE, checkedKey } from "@/lib/ledger/balance-check";
+import { setMeta } from "@/lib/db/dexie";
 import { today } from "@/lib/dates";
 import { parseAmount, type Currency } from "@/lib/money";
 
@@ -12,7 +14,16 @@ import { parseAmount, type Currency } from "@/lib/money";
  * "I have this much cash in hand." Anything the ledger cannot explain goes to
  * Expense:Unaccounted rather than quietly adjusting a balance.
  */
-export function Reconcile({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+export function Reconcile({
+  open,
+  onOpenChange,
+  /** Preselect an account, so /accounts can send you straight to one. */
+  accountId: requested,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  accountId?: string;
+}) {
   const snapshot = useSnapshot();
   const accounts = useMemo(() => accountsByUsage(snapshot).filter((a) => a.type === "asset"), [snapshot]);
   const [chosenId, setChosenId] = useState("");
@@ -21,7 +32,7 @@ export function Reconcile({ open, onOpenChange }: { open: boolean; onOpenChange:
   const [busy, setBusy] = useState(false);
 
   // Derived, so the default survives the snapshot arriving after first render.
-  const accountId = chosenId || accounts[0]?.id || "";
+  const accountId = chosenId || requested || accounts[0]?.id || "";
 
   if (!open) {
     return (
@@ -44,18 +55,23 @@ export function Reconcile({ open, onOpenChange }: { open: boolean; onOpenChange:
     setBusy(true);
     try {
       const result = await composeReconcile(snapshot, accountId, amount);
-      if (!result) {
-        onOpenChange(false);
-        setActual("");
-        return;
+
+      // Record the check either way. A reconcile that finds a difference
+      // leaves a transaction, but "I looked and it was right" posts nothing —
+      // and that is the usual outcome, and exactly what the balance-check
+      // prompt needs to know in order to stop nagging.
+      await setMeta(checkedKey(accountId), today());
+
+      if (result) {
+        await postTransaction({
+          booked_on: today(),
+          payee: RECONCILE_PAYEE,
+          note: "Counted cash in hand",
+          entries: result.entries,
+        });
       }
-      await postTransaction({
-        booked_on: today(),
-        payee: "Reconcile",
-        note: "Counted cash in hand",
-        entries: result.entries,
-      });
       onOpenChange(false);
+      setChosenId("");
       setActual("");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not reconcile");
@@ -81,11 +97,14 @@ export function Reconcile({ open, onOpenChange }: { open: boolean; onOpenChange:
         value={actual}
         onChange={(e) => setActual(e.target.value)}
       />
-      <p className="text-muted">The difference is booked to Expense:Unaccounted.</p>
+      <p className="text-muted">
+        Any difference is booked to Expense:Unaccounted. If it already matches, nothing is
+        recorded except that you checked.
+      </p>
       <ErrorNote>{error}</ErrorNote>
       <div className="flex gap-2">
         <Button type="button" variant="primary" onClick={submit} className="flex-1" disabled={busy}>
-          Book difference
+          Confirm balance
         </Button>
         <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
           Cancel
