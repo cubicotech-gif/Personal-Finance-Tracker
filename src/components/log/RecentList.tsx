@@ -4,8 +4,9 @@ import { AnimatePresence, motion, useReducedMotion, type PanInfo } from "framer-
 import { IconArrowsLeftRight, IconArrowDownLeft, IconTrash, IconCategory2 } from "@tabler/icons-react";
 import { CategoryIcon } from "@/components/CategoryIcon";
 import { Money } from "@/components/Money";
-import { describe, type LogRow } from "@/lib/ledger/log";
-import { formatRelativeDay } from "@/lib/dates";
+import { useMemo, useState } from "react";
+import { Chip, ChipRow } from "@/components/ui";
+import { describe, groupLogRowsByDay, type LogRow } from "@/lib/ledger/log";
 
 /** Drag this far left, in px, and the row is deleted on release. */
 const DELETE_AT = -88;
@@ -81,10 +82,13 @@ function LogListRow({
         <span className="min-w-0 flex-1">
           <span className="block truncate font-medium">{describe(row)}</span>
           <span className="block truncate text-muted">
-            {formatRelativeDay(row.transaction.booked_on)}
-            {row.direction === "split" ? ` · ${row.lineCount} lines` : ""}
-            {row.account ? ` · ${row.account.name}` : ""}
-            {row.counterparty ? ` · ${row.counterparty.name}` : ""}
+            {[
+              row.direction === "split" ? `${row.lineCount} lines` : null,
+              row.account?.name,
+              row.counterparty?.name,
+            ]
+              .filter(Boolean)
+              .join(" · ")}
           </span>
         </span>
         <Money
@@ -99,6 +103,37 @@ function LogListRow({
   );
 }
 
+/** "All", in or out, then whichever categories actually appear below. */
+type Filter = { id: string; label: string; icon?: string };
+
+function filtersFor(rows: LogRow[]): Filter[] {
+  const categories = new Map<string, Filter>();
+  for (const row of rows) {
+    if (row.category && !categories.has(row.category.id)) {
+      categories.set(row.category.id, {
+        id: `cat:${row.category.id}`,
+        label: row.category.name,
+        icon: row.category.icon,
+      });
+    }
+  }
+
+  // Offering every category when only two were used is noise, so the list is
+  // built from what is actually on screen rather than from the category table.
+  return [
+    { id: "all", label: "All" },
+    ...(rows.some((r) => r.direction === "out") ? [{ id: "out", label: "Out" }] : []),
+    ...(rows.some((r) => r.direction === "in") ? [{ id: "in", label: "In" }] : []),
+    ...[...categories.values()].sort((a, b) => a.label.localeCompare(b.label)),
+  ];
+}
+
+function matches(row: LogRow, filter: string): boolean {
+  if (filter === "all") return true;
+  if (filter === "in" || filter === "out") return row.direction === filter;
+  return row.category?.id === filter.slice(4);
+}
+
 export function RecentList({
   rows,
   onEdit,
@@ -108,13 +143,59 @@ export function RecentList({
   onEdit: (row: LogRow) => void;
   onDelete: (row: LogRow) => void;
 }) {
+  const [filter, setFilter] = useState("all");
+
+  const filters = useMemo(() => filtersFor(rows), [rows]);
+  // A filter stops applying once nothing it matched is left in range.
+  const active = filters.some((f) => f.id === filter) ? filter : "all";
+  const days = useMemo(
+    () => groupLogRowsByDay(rows.filter((row) => matches(row, active))),
+    [rows, active],
+  );
+
   return (
-    <ul className="space-y-1">
-      <AnimatePresence initial={false}>
-        {rows.map((row) => (
-          <LogListRow key={row.transaction.id} row={row} onEdit={onEdit} onDelete={onDelete} />
-        ))}
-      </AnimatePresence>
-    </ul>
+    <div className="space-y-3">
+      {filters.length > 2 && (
+        <ChipRow label="Filter activity">
+          {filters.map((option) => (
+            <Chip
+              key={option.id}
+              selected={active === option.id}
+              onClick={() => setFilter(option.id)}
+            >
+              {option.icon ? `${option.icon} ${option.label}` : option.label}
+            </Chip>
+          ))}
+        </ChipRow>
+      )}
+
+      {days.length === 0 ? (
+        <p className="py-6 text-center text-muted">Nothing matches that filter.</p>
+      ) : (
+        days.map((day) => (
+          <section key={day.on}>
+            <div className="flex items-baseline justify-between px-1 pb-1.5">
+              <h3 className="t-label text-muted">{day.label}</h3>
+              {day.net !== 0n && (
+                <Money
+                  amount={day.net}
+                  signed
+                  compact
+                  tone={day.net > 0n ? "positive" : "plain"}
+                  className="t-label text-muted"
+                />
+              )}
+            </div>
+            <ul className="space-y-1">
+              <AnimatePresence initial={false}>
+                {day.rows.map((row) => (
+                  <LogListRow key={row.transaction.id} row={row} onEdit={onEdit} onDelete={onDelete} />
+                ))}
+              </AnimatePresence>
+            </ul>
+          </section>
+        ))
+      )}
+    </div>
   );
 }

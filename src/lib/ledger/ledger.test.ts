@@ -14,7 +14,7 @@ import { buildSnapshot } from "./snapshot";
 import { accountBalances, summarise } from "./accounts";
 import { debtPositions } from "./people";
 import { composeEntries, decompose } from "./compose";
-import { toLogRow } from "./log";
+import { groupLogRowsByDay, toLogRow } from "./log";
 
 // --------------------------------------------------------------------------
 // Fixtures
@@ -496,5 +496,66 @@ describe("toLogRow", () => {
     const row = toLogRow(snapshot, snapshot.transactions[0] as TransactionRow);
     assert.equal(row.direction, "out");
     assert.equal(row.amount, 45_000n);
+  });
+});
+
+describe("groupLogRowsByDay", () => {
+  const accounts = [
+    account("cash", "Cash", "asset"),
+    account("bank", "Meezan", "asset"),
+    account("exp", "Expenses", "expense"),
+    account("inc", "Salary", "income"),
+  ];
+
+  /** Newest first, exactly as the screen receives them. */
+  function rows() {
+    const transactions = [txn("t3", "2026-10-21"), txn("t2", "2026-10-21"), txn("t1", "2026-10-20")];
+    const entries = [
+      entry("a1", "t3", "cash", -430n),
+      entry("a2", "t3", "exp", 430n),
+      entry("b1", "t2", "cash", 56_000n),
+      entry("b2", "t2", "inc", -56_000n),
+      entry("c1", "t1", "cash", -1_000n),
+      entry("c2", "t1", "exp", 1_000n),
+    ];
+    const snapshot = buildSnapshot({ accounts, transactions, entries });
+    return snapshot.transactions.map((t) => toLogRow(snapshot, t));
+  }
+
+  it("breaks on a change of date and keeps newest first", () => {
+    const days = groupLogRowsByDay(rows());
+    assert.equal(days.length, 2);
+    assert.equal(days[0]?.on, "2026-10-21");
+    assert.equal(days[0]?.rows.length, 2);
+    assert.equal(days[1]?.on, "2026-10-20");
+    assert.equal(days[1]?.rows.length, 1);
+  });
+
+  it("nets each day on its own", () => {
+    const days = groupLogRowsByDay(rows());
+    assert.equal(days[0]?.net, 55_570n, "56,000 in less 430 out");
+    assert.equal(days[1]?.net, -1_000n);
+  });
+
+  it("counts neither transfers nor splits towards a day's net", () => {
+    const transactions = [txn("t1", "2026-10-21"), txn("t2", "2026-10-21")];
+    const entries = [
+      // A transfer between my own accounts.
+      entry("x1", "t1", "cash", -5_000n),
+      entry("x2", "t1", "bank", 5_000n),
+      // A split: two money legs plus a category leg.
+      entry("y1", "t2", "cash", -2_000n),
+      entry("y2", "t2", "bank", -1_000n),
+      entry("y3", "t2", "exp", 3_000n),
+    ];
+    const snapshot = buildSnapshot({ accounts, transactions, entries });
+    const days = groupLogRowsByDay(snapshot.transactions.map((t) => toLogRow(snapshot, t)));
+    assert.equal(days.length, 1);
+    assert.equal(days[0]?.rows.length, 2);
+    assert.equal(days[0]?.net, 0n, "neither changes what I am worth");
+  });
+
+  it("returns nothing for an empty list", () => {
+    assert.deepEqual(groupLogRowsByDay([]), []);
   });
 });

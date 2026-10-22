@@ -3,6 +3,7 @@
 import type { AccountRow, CategoryRow, CounterpartyRow, EntryRow, TransactionRow } from "@/lib/db/types";
 import type { Currency, Minor } from "@/lib/money";
 import { abs } from "@/lib/money";
+import { type IsoDate, formatRelativeDay } from "@/lib/dates";
 import { type Snapshot, entryAmount, pkr } from "./snapshot";
 
 /**
@@ -106,4 +107,48 @@ export function describe(row: LogRow): string {
   if (row.category) return row.category.name;
   if (row.counterparty) return row.counterparty.name;
   return row.direction === "in" ? "Money in" : "Money out";
+}
+
+/** One day's worth of activity, with the day's own net movement. */
+export interface LogDay {
+  /** booked_on for the whole group. */
+  on: IsoDate;
+  label: string;
+  /**
+   * Money in minus money out for the day, in PKR.
+   *
+   * Transfers and splits contribute nothing: moving cash between your own
+   * accounts does not change your position, and a split has no single
+   * direction to add up. Counting either would make the day's figure a number
+   * that means nothing.
+   */
+  net: Minor;
+  rows: LogRow[];
+}
+
+/**
+ * Group activity by the day it was booked.
+ *
+ * Rows already arrive newest first, so this preserves that order and only has
+ * to break on a change of date. Grouping also lets each row drop its own date,
+ * which on a busy day was the same four characters repeated down the screen.
+ */
+export function groupLogRowsByDay(rows: LogRow[]): LogDay[] {
+  const days: LogDay[] = [];
+
+  for (const row of rows) {
+    const on = row.transaction.booked_on;
+    let day = days[days.length - 1];
+
+    if (!day || day.on !== on) {
+      day = { on, label: formatRelativeDay(on), net: 0n, rows: [] };
+      days.push(day);
+    }
+
+    day.rows.push(row);
+    if (row.direction === "in") day.net += row.amountPkr;
+    else if (row.direction === "out") day.net -= row.amountPkr;
+  }
+
+  return days;
 }

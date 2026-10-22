@@ -6,6 +6,7 @@ import { useEffect, type ReactNode } from "react";
 import { useApp } from "@/lib/sync/provider";
 import { useSnapshot } from "@/lib/ledger/snapshot";
 import { IconLayoutGrid, IconPlus, IconUsers, IconWallet } from "@tabler/icons-react";
+import { PrivacyToggle } from "./PrivacyToggle";
 import { ThemeToggle } from "./ThemeToggle";
 import { cx } from "./ui";
 
@@ -93,7 +94,10 @@ function Sidebar({ pathname }: { pathname: string }) {
 
       <div className="mt-auto flex items-center justify-between px-3">
         <SyncStatus />
-        <ThemeToggle />
+        <div className="flex items-center">
+          <PrivacyToggle />
+          <ThemeToggle />
+        </div>
       </div>
     </aside>
   );
@@ -112,6 +116,7 @@ export function Shell({ title, children }: { title: string; children: ReactNode 
           <h1 className="t-label text-muted">{title}</h1>
           <div className="flex items-center gap-1">
             <SyncStatus />
+            <PrivacyToggle />
             <ThemeToggle />
           </div>
         </header>

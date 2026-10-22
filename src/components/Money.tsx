@@ -2,6 +2,7 @@
 
 import type { Currency, Minor } from "@/lib/money";
 import { formatAmount, symbolFor } from "@/lib/format";
+import { usePrivacy } from "@/lib/privacy";
 import { useCountUp } from "@/lib/useCountUp";
 import { cx } from "./ui";
 
@@ -38,6 +39,7 @@ export function Money({
 }) {
   const counted = useCountUp(amount, 400, countOnMount);
   const shown = animate ? counted : amount;
+  const { private: hidden } = usePrivacy();
 
   const colour =
     tone === "danger"
@@ -54,7 +56,14 @@ export function Money({
   const sign = text.startsWith("-") || text.startsWith("+") ? text[0] : "";
 
   return (
-    <span className={cx("tabular", colour, className)}>
+    <span
+      className={cx(
+        "tabular",
+        colour,
+        hidden && "select-none blur-[6px] transition-[filter]",
+        className,
+      )}
+    >
       {sign}
       {symbol && <span className="mr-[0.12em]">{symbolFor(currency)}</span>}
       {sign ? text.slice(1) : text}
