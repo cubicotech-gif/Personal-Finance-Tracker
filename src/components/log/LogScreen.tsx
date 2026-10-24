@@ -15,6 +15,7 @@ import { buildBoxes, currentPeriod } from "@/lib/ledger/boxes";
 import { pkr, useSnapshot } from "@/lib/ledger/snapshot";
 import { deleteTransaction, postTransaction, restoreTransaction } from "@/lib/db/mutations";
 import {
+  type Direction,
   KIND_LABEL,
   accountsByUsage,
   composeEntries,
@@ -56,9 +57,10 @@ const SAVE_H = 76;
 
 interface FormState {
   amount: string;
-  direction: "in" | "out";
+  direction: Direction;
   kind: MoneyKind;
   accountId: string;
+  toAccountId: string | null;
   categoryId: string | null;
   incomeAccountId: string | null;
   counterpartyId: string | null;
@@ -74,6 +76,7 @@ function initialForm(): FormState {
     direction: "out",
     kind: "expense",
     accountId: "",
+    toAccountId: null,
     categoryId: null,
     incomeAccountId: null,
     counterpartyId: null,
@@ -125,6 +128,15 @@ export function LogScreen() {
   const account = snapshot.accountsById.get(accountId);
   const currency: Currency = account?.currency ?? "PKR";
   const kinds = kindsFor(form.direction, Boolean(form.counterpartyId));
+  const moving = form.direction === "move";
+  // Derived, so it can never end up equal to the source or point at a deleted
+  // account; the form only remembers an explicit choice.
+  const toAccountId =
+    moving
+      ? (form.toAccountId && form.toAccountId !== accountId
+          ? form.toAccountId
+          : (accounts.find((a) => a.id !== accountId)?.id ?? ""))
+      : null;
   const kind = kinds.includes(form.kind) ? form.kind : (kinds[0] ?? "expense");
 
   const patch = useCallback((change: Partial<FormState>) => {
@@ -183,6 +195,7 @@ export function LogScreen() {
       kind,
       amount,
       accountId,
+      toAccountId,
       categoryId: kind === "expense" ? form.categoryId : null,
       counterpartyId: form.counterpartyId,
       incomeAccountId: form.incomeAccountId,
@@ -240,6 +253,7 @@ export function LogScreen() {
       direction: draft.direction,
       kind: draft.kind,
       accountId: draft.accountId,
+      toAccountId: draft.toAccountId ?? null,
       categoryId: draft.categoryId ?? null,
       incomeAccountId: draft.incomeAccountId ?? null,
       counterpartyId: draft.counterpartyId ?? null,
@@ -345,13 +359,30 @@ export function LogScreen() {
         )}
 
         {/* Account pills ------------------------------------------------- */}
-        <ChipRow label="Account">
+        <ChipRow label={moving ? "From account" : "Account"}>
           {accounts.map((option) => (
             <Chip key={option.id} selected={accountId === option.id} onClick={() => patch({ accountId: option.id })}>
               {option.name}
             </Chip>
           ))}
         </ChipRow>
+
+        {/* Where a move lands. The source is never offered as a destination. */}
+        {moving && (
+          <ChipRow label="To account">
+            {accounts
+              .filter((option) => option.id !== accountId)
+              .map((option) => (
+                <Chip
+                  key={option.id}
+                  selected={toAccountId === option.id}
+                  onClick={() => patch({ toAccountId: option.id })}
+                >
+                  {option.name}
+                </Chip>
+              ))}
+          </ChipRow>
+        )}
 
         {/* Kind, only when a counterparty makes it ambiguous -------------- */}
         {kinds.length > 1 && (
@@ -366,8 +397,8 @@ export function LogScreen() {
 
         {/* Direction, with the one optional control beside it -------------- */}
         <div className="flex items-center gap-2">
-          <div role="group" aria-label="Direction" className="grid flex-1 grid-cols-2 rounded-2xl bg-surface p-1">
-            {(["out", "in"] as const).map((direction) => {
+          <div role="group" aria-label="Direction" className="grid flex-1 grid-cols-3 rounded-2xl bg-surface p-1">
+            {(["out", "in", "move"] as const).map((direction) => {
               const on = form.direction === direction;
               return (
                 <button
@@ -381,7 +412,7 @@ export function LogScreen() {
                     on && direction === "in" && "text-accent",
                   )}
                 >
-                  {direction === "out" ? "Out" : "In"}
+                  {direction === "out" ? "Out" : direction === "in" ? "In" : "Move"}
                 </button>
               );
             })}

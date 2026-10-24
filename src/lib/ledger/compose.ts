@@ -32,15 +32,27 @@ import {
 
 
 /** What the money actually did, beyond simply arriving or leaving. */
-export type MoneyKind = "expense" | "income" | "lend" | "borrow" | "repay_debt" | "receive_repayment";
+export type MoneyKind =
+  | "expense"
+  | "income"
+  | "lend"
+  | "borrow"
+  | "repay_debt"
+  | "receive_repayment"
+  | "transfer";
+
+/** Out of an account, into one, or between two of my own. */
+export type Direction = "in" | "out" | "move";
 
 export interface LogDraft {
   bookedOn: IsoDate;
-  direction: "in" | "out";
+  direction: Direction;
   kind: MoneyKind;
   /** Positive. Direction and kind decide the signs. */
   amount: Minor;
   accountId: string;
+  /** Where a transfer lands. Ignored by every other kind. */
+  toAccountId?: string | null;
   categoryId?: string | null;
   counterpartyId?: string | null;
   incomeAccountId?: string | null;
@@ -122,6 +134,31 @@ export async function composeEntries(snapshot: Snapshot, draft: LogDraft): Promi
 
   const account = accountOrThrow(snapshot, draft.accountId);
   const currency = account.currency;
+
+  /*
+    Moving money between my own accounts is not income and not an expense —
+    nothing has been earned or consumed, it is in a different pocket. Both legs
+    are real accounts, so it touches no category and no counterparty, and it
+    leaves every spending figure alone. Recording it as an expense out of one
+    account and income into another, which is what people do when an app has no
+    transfer, inflates both sides of the month by the amount moved.
+  */
+  if (draft.kind === "transfer") {
+    const to = draft.toAccountId ? snapshot.accountsById.get(draft.toAccountId) : undefined;
+    if (!to) throw new Error("Pick an account to move to");
+    if (to.id === account.id) throw new Error("Pick two different accounts");
+    if (to.currency !== currency) {
+      // The trigger balances per currency, so a cross-currency move needs a
+      // rate and four legs. Until there is a screen for that, refuse clearly
+      // rather than writing something that cannot balance.
+      throw new Error(`Moving ${currency} to ${to.currency} is not supported yet`);
+    }
+    return [
+      { account_id: account.id, amount_minor: -draft.amount, counterparty_id: null, category_id: null },
+      { account_id: to.id, amount_minor: draft.amount, counterparty_id: null, category_id: null },
+    ];
+  }
+
   const outflow = draft.direction === "out";
   // The money leg: leaving my account is a credit, arriving is a debit.
   const moneyLeg: EntryDraft = {
@@ -230,7 +267,8 @@ export async function composeReconcile(
 }
 
 /** The two special chips that appear on /log once a counterparty is picked. */
-export function kindsFor(direction: "in" | "out", hasCounterparty: boolean): MoneyKind[] {
+export function kindsFor(direction: Direction, hasCounterparty: boolean): MoneyKind[] {
+  if (direction === "move") return ["transfer"];
   if (direction === "out") {
     return hasCounterparty ? ["expense", "lend", "repay_debt"] : ["expense"];
   }
@@ -244,6 +282,7 @@ export const KIND_LABEL: Record<MoneyKind, string> = {
   borrow: "Borrowed",
   repay_debt: "Paid them back",
   receive_repayment: "They paid back",
+  transfer: "Moved",
 };
 
 /**
@@ -272,6 +311,33 @@ export function decompose(snapshot: Snapshot, transactionId: string): LogDraft |
     if (base === PAYABLES.toLowerCase() || base === CLIENT_FLOAT.toLowerCase()) return "payable";
     return null;
   };
+
+  // Two money accounts and nothing else is a transfer, whichever way round.
+  if (
+    (accountA.type === "asset" || accountA.type === "liability") &&
+    (accountB.type === "asset" || accountB.type === "liability") &&
+    !a.category_id &&
+    !b.category_id &&
+    !a.counterparty_id &&
+    !b.counterparty_id
+  ) {
+    const from = entryAmount(a) < 0n ? a : b;
+    const to = from === a ? b : a;
+    return {
+      bookedOn: transaction.booked_on,
+      direction: "move",
+      kind: "transfer",
+      amount: entryAmount(to),
+      accountId: from.account_id,
+      toAccountId: to.account_id,
+      categoryId: null,
+      counterpartyId: null,
+      incomeAccountId: null,
+      payee: transaction.payee,
+      note: transaction.note,
+      dueOn: null,
+    };
+  }
 
   const pairs: [typeof a, AccountRow, typeof b, AccountRow][] = [
     [a, accountA, b, accountB],

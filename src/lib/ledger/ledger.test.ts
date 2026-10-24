@@ -292,6 +292,7 @@ describe("composeEntries", () => {
     account("pay", "Payables", "liability"),
     account("cfloat", "Client float", "liability"),
     account("frecv", "Float receivable", "asset"),
+    account("bank", "Meezan", "asset"),
   ];
   const snapshot = buildSnapshot({
     accounts,
@@ -367,6 +368,62 @@ describe("composeEntries", () => {
     assert.equal(fromPerson.find((e) => e.account_id !== "cash")?.account_id, "pay");
   });
 
+  it("moves money between my own accounts without touching income or spending", async () => {
+    // The thing the app could not record: Samba -> Meezan, then spend from it.
+    const entries = await composeEntries(snapshot, {
+      bookedOn: "2026-10-22",
+      direction: "move",
+      kind: "transfer",
+      amount: 500_000n,
+      accountId: "cash",
+      toAccountId: "bank",
+    });
+
+    assert.equal(entries.length, 2);
+    assert.equal(entries.reduce((total, e) => total + e.amount_minor, 0n), 0n);
+    assert.equal(entries.find((e) => e.account_id === "cash")?.amount_minor, -500_000n);
+    assert.equal(entries.find((e) => e.account_id === "bank")?.amount_minor, 500_000n);
+    // Neither leg may carry a category or a person, or the move would show up
+    // as spending and inflate the month by the amount moved.
+    for (const line of entries) {
+      assert.equal(line.category_id, null);
+      assert.equal(line.counterparty_id, null);
+    }
+  });
+
+  it("refuses a move to the same account", async () => {
+    await assert.rejects(
+      composeEntries(snapshot, {
+        bookedOn: "2026-10-22",
+        direction: "move",
+        kind: "transfer",
+        amount: 1_000n,
+        accountId: "cash",
+        toAccountId: "cash",
+      }),
+      /two different accounts/,
+    );
+  });
+
+  it("refuses a cross-currency move rather than writing one that cannot balance", async () => {
+    const withUsd = buildSnapshot({
+      accounts: [...accounts, account("usd", "Payoneer", "asset", { currency: "USD" })],
+      counterparties: [counterparty("ali", "Ali")],
+      categories: [category("groceries", "Groceries")],
+    });
+    await assert.rejects(
+      composeEntries(withUsd, {
+        bookedOn: "2026-10-22",
+        direction: "move",
+        kind: "transfer",
+        amount: 1_000n,
+        accountId: "cash",
+        toAccountId: "usd",
+      }),
+      /not supported yet/,
+    );
+  });
+
   it("refuses a loan with nobody attached to it", async () => {
     await assert.rejects(
       composeEntries(snapshot, {
@@ -435,6 +492,21 @@ describe("decompose", () => {
     const draft = decompose(snapshot, "t1");
     assert.equal(draft?.kind, "receive_repayment");
     assert.equal(draft?.counterpartyId, "ali");
+  });
+
+  it("reopens a transfer as a move, not as a split", () => {
+    const entries = [entry("e1", "t1", "cash", -500_000n), entry("e2", "t1", "bank", 500_000n)];
+    const snapshot = buildSnapshot({
+      accounts: [...accounts, account("bank", "Meezan", "asset")],
+      transactions: [txn("t1", "2026-10-22")],
+      entries,
+    });
+    const draft = decompose(snapshot, "t1");
+    assert.equal(draft?.kind, "transfer");
+    assert.equal(draft?.direction, "move");
+    assert.equal(draft?.accountId, "cash", "the account it left");
+    assert.equal(draft?.toAccountId, "bank", "the account it landed in");
+    assert.equal(draft?.amount, 500_000n);
   });
 
   it("declines anything the quick form cannot represent", () => {
