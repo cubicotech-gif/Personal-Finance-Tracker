@@ -17,6 +17,8 @@ export interface LogRow {
   transaction: TransactionRow;
   direction: Direction;
   account: AccountRow | null;
+  /** Where a transfer landed. Null for everything else. */
+  toAccount: AccountRow | null;
   /** Positive; the direction carries the sign. In the account's own currency. */
   amount: Minor;
   currency: Currency;
@@ -60,6 +62,9 @@ export function toLogRow(snapshot: Snapshot, transaction: TransactionRow): LogRo
 
   const split = direction === "split";
   const account = !split && primary ? (snapshot.accountsById.get(primary.account_id) ?? null) : null;
+  // A transfer is only legible as a pair: "Samba to Meezan", not "Samba".
+  const destination =
+    direction === "transfer" ? (moneyLegs.find((entry) => entry !== primary) ?? null) : null;
   const currency = account?.currency ?? "PKR";
 
   // A split has no single account, category or counterparty that describes it,
@@ -85,6 +90,7 @@ export function toLogRow(snapshot: Snapshot, transaction: TransactionRow): LogRo
     transaction,
     direction,
     account,
+    toAccount: destination ? (snapshot.accountsById.get(destination.account_id) ?? null) : null,
     amount: native,
     currency,
     amountPkr: pkr(snapshot, native, currency),

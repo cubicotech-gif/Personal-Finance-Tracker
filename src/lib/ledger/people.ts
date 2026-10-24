@@ -1,6 +1,6 @@
 "use client";
 
-import type { CounterpartyRow, EntryRow } from "@/lib/db/types";
+import type { AccountRow, CounterpartyRow, EntryRow } from "@/lib/db/types";
 import type { Currency, Minor } from "@/lib/money";
 import { abs } from "@/lib/money";
 import { type IsoDate, daysSince } from "@/lib/dates";
@@ -17,9 +17,26 @@ import { type Snapshot, entryAmount, pkr } from "./snapshot";
 
 export type DebtDirection = "owes_me" | "i_owe";
 
+/**
+ * Which kind of debt this is.
+ *
+ * "callable" is money that was never mine — client float, a payment that
+ * landed by mistake — and can be demanded any day with no notice. "term" is a
+ * borrowing with a shape to it: a date, or an understanding. The two must never
+ * be added into a single "I owe" figure, because the first is an emergency and
+ * the second is a plan.
+ */
+export type DebtClass = "callable" | "term";
+
 export interface DebtPosition {
   counterparty: CounterpartyRow;
   direction: DebtDirection;
+  /**
+   * The bucket this position sits in, when positions are split per account.
+   * Null when a counterparty's accounts have been netted together.
+   */
+  account: AccountRow | null;
+  klass: DebtClass;
   /** Always positive — the direction carries the sign. */
   amountPkr: Minor;
   /** Positive amounts per currency, for the mixed-currency case. */
@@ -40,7 +57,15 @@ interface Lot {
   remaining: Minor;
 }
 
-export function debtPositions(snapshot: Snapshot): DebtPosition[] {
+/**
+ * One debt, netted and aged.
+ *
+ * @param groupByAccount Keep a counterparty's callable and term debts apart
+ *   rather than netting them into one figure. Someone can hold both — a loan
+ *   with a due date and a payment that landed by mistake — and collapsing them
+ *   hides the callable half, which is the half that can ruin a week.
+ */
+export function debtPositions(snapshot: Snapshot, groupByAccount = false): DebtPosition[] {
   // Only receivable/payable lines count. A counterparty tagged on an expense is
   // a note about who the money went to, not a debt.
   const relevant = snapshot.entries.filter((entry) => {
@@ -51,7 +76,9 @@ export function debtPositions(snapshot: Snapshot): DebtPosition[] {
 
   const grouped = new Map<string, EntryRow[]>();
   for (const entry of relevant) {
-    const key = entry.counterparty_id as string;
+    const key = groupByAccount
+      ? `${entry.counterparty_id}\u0000${entry.account_id}`
+      : (entry.counterparty_id as string);
     const bucket = grouped.get(key);
     if (bucket) bucket.push(entry);
     else grouped.set(key, [entry]);
@@ -59,9 +86,16 @@ export function debtPositions(snapshot: Snapshot): DebtPosition[] {
 
   const positions: DebtPosition[] = [];
 
-  for (const [counterpartyId, entries] of grouped) {
-    const counterparty = snapshot.counterpartiesById.get(counterpartyId);
+  for (const [key, entries] of grouped) {
+    const counterpartyId = groupByAccount ? key.split("\u0000")[0] : key;
+    const counterparty = counterpartyId
+      ? snapshot.counterpartiesById.get(counterpartyId)
+      : undefined;
     if (!counterparty) continue;
+
+    const groupAccount = groupByAccount
+      ? (snapshot.accountsById.get(key.split("\u0000")[1] ?? "") ?? null)
+      : null;
 
     const dated = entries
       .map((entry) => {
@@ -124,15 +158,22 @@ export function debtPositions(snapshot: Snapshot): DebtPosition[] {
     }
 
     const oldest = open[0];
+    const settlementAccountId = oldest?.accountId ?? dated[dated.length - 1]?.accountId ?? null;
+    // A debt is callable because of the account it sits on, not because of who
+    // it is with: the same person can hold both kinds.
+    const bucket = groupAccount ?? (settlementAccountId ? snapshot.accountsById.get(settlementAccountId) ?? null : null);
+
     positions.push({
       counterparty,
       direction: netSign === 1 ? "owes_me" : "i_owe",
+      account: groupAccount,
+      klass: bucket?.is_float ? "callable" : "term",
       amountPkr: abs(netPkr),
       byCurrency,
       openedOn: oldest?.on ?? null,
       daysOutstanding: oldest?.on ? daysSince(oldest.on) : null,
       dueOn: oldest?.due ?? null,
-      settlementAccountId: oldest?.accountId ?? dated[dated.length - 1]?.accountId ?? null,
+      settlementAccountId,
     });
   }
 

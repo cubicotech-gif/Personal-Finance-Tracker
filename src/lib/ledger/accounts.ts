@@ -73,6 +73,12 @@ export interface AccountsSummary {
   /** Cash actually sitting in float accounts. */
   floatCash: Minor;
   /**
+   * Every rupee physically reachable, float money included. This is the figure
+   * a bank app would show, and on its own it is misleading — most of it is
+   * other people's. Always read next to `mine`.
+   */
+  cash: Minor;
+  /**
    * floatCash − heldForOthers. Negative means float money has been spent and
    * there is a hole to refill. This is never a budget envelope and is never
    * assignable.
@@ -116,6 +122,7 @@ export function summarise(balances: AccountBalance[]): AccountsSummary {
     mine: nonFloatCash + (floatShortfall < 0n ? floatShortfall : 0n),
     heldForOthers: floatOwed,
     floatCash,
+    cash: nonFloatCash + floatCash,
     floatShortfall,
     assets,
     liabilities,

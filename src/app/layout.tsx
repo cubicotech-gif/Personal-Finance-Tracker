@@ -4,14 +4,14 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Finance",
-  description: "Personal double-entry ledger and budget envelopes",
+  description: "Float and cash command centre",
   manifest: "/manifest.webmanifest",
   appleWebApp: { capable: true, statusBarStyle: "black", title: "Finance" },
   icons: { icon: "/icon-192.png", apple: "/apple-touch-icon.png" },
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0b0b0c",
+  themeColor: "#0b0f19",
   width: "device-width",
   initialScale: 1,
   // Installed apps should not rubber-band-zoom when the keypad opens.
@@ -21,15 +21,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <head>
-        {/* Dark is the default; apply a saved light choice before first paint. */}
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `try{if(localStorage.getItem("theme")==="light")document.documentElement.dataset.theme="light"}catch(e){}`,
-          }}
-        />
-      </head>
+    <html lang="en">
       <body className="antialiased">
         <AppProvider>{children}</AppProvider>
       </body>

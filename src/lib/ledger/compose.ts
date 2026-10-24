@@ -55,6 +55,17 @@ export interface LogDraft {
   toAccountId?: string | null;
   categoryId?: string | null;
   counterpartyId?: string | null;
+  /**
+   * Settle against this exact receivable/payable account.
+   *
+   * One person can owe in two buckets at once — a term loan and a payment that
+   * landed by mistake and is callable — so "who" does not say which debt is
+   * being paid. When the screen knows the debt, it names the account and the
+   * repayment lands on the right one; without this, deriving the account from
+   * the counterparty would quietly credit the wrong bucket and the callable
+   * figure, the one that matters, would never come down.
+   */
+  debtAccountId?: string | null;
   incomeAccountId?: string | null;
   payee?: string | null;
   note?: string | null;
@@ -206,15 +217,13 @@ export async function composeEntries(snapshot: Snapshot, draft: LogDraft): Promi
     case "repay_debt": {
       // Paying down what I owe: the liability shrinks, no expense is incurred.
       contraCounterparty = requireCounterparty(draft);
-      const target = debtAccount(snapshot, contraCounterparty, false);
-      contraId = await ensure(snapshot, target.name, target.type, currency, target.sort, target.isFloat);
+      contraId = await settlementAccount(snapshot, draft, contraCounterparty, false, currency);
       break;
     }
 
     case "receive_repayment": {
       contraCounterparty = requireCounterparty(draft);
-      const target = debtAccount(snapshot, contraCounterparty, true);
-      contraId = await ensure(snapshot, target.name, target.type, currency, target.sort, target.isFloat);
+      contraId = await settlementAccount(snapshot, draft, contraCounterparty, true, currency);
       break;
     }
   }
@@ -228,6 +237,31 @@ export async function composeEntries(snapshot: Snapshot, draft: LogDraft): Promi
   };
 
   return [moneyLeg, contraLeg];
+}
+
+/**
+ * The account a settlement lands on: the one the screen named, or the bucket
+ * the counterparty's kind implies.
+ */
+async function settlementAccount(
+  snapshot: Snapshot,
+  draft: LogDraft,
+  counterpartyId: string,
+  owedToMe: boolean,
+  currency: Currency,
+): Promise<string> {
+  const named = draft.debtAccountId ? snapshot.accountsById.get(draft.debtAccountId) : undefined;
+  if (named) {
+    // Settling a rupee debt out of a dollar account cannot balance, and the
+    // trigger would reject it after the fact. Say so now.
+    if (named.currency !== currency) {
+      throw new Error(`That debt is in ${named.currency}, not ${currency}`);
+    }
+    return named.id;
+  }
+
+  const target = debtAccount(snapshot, counterpartyId, owedToMe);
+  return ensure(snapshot, target.name, target.type, currency, target.sort, target.isFloat);
 }
 
 function requireCounterparty(draft: LogDraft): string {

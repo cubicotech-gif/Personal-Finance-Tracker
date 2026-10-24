@@ -1,42 +1,106 @@
 "use client";
 
-import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode } from "react";
+import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes } from "react";
 
-/** Tap targets are 44px minimum throughout — this is a phone-first app. */
+/**
+ * The pieces the reference design is built from: a slate card with a one-pixel
+ * border and a 24px radius, a small all-caps heading, a pill, a bar.
+ *
+ * Tap targets are 44px minimum throughout — this is a phone-first app.
+ */
 const TAP = "min-h-11";
-
-/** True when the caller passed their own background, which must win over the default. */
-const hasBg = (className?: string) => Boolean(className && /(^|\s)bg-/.test(className));
 
 export function cx(...parts: (string | false | null | undefined)[]): string {
   return parts.filter(Boolean).join(" ");
 }
 
-export function Card({ children, className }: { children: ReactNode; className?: string }) {
+export function Card({
+  children,
+  className,
+  tone = "plain",
+}: {
+  children: ReactNode;
+  className?: string;
+  /** A hero card is tinted; an ordinary card is flat slate. */
+  tone?: "plain" | "accent" | "danger";
+}) {
+  const tones = {
+    plain: "border-line bg-surface",
+    accent: "border-accent-line bg-gradient-to-br from-accent-soft to-surface",
+    danger: "border-danger-line bg-gradient-to-br from-danger-soft to-surface",
+  }[tone];
+
+  return <div className={cx("rounded-3xl border", tones, className)}>{children}</div>;
+}
+
+export function SectionTitle({ children, aside }: { children: ReactNode; aside?: ReactNode }) {
   return (
-    <div className={cx("rounded-2xl bg-surface", className)}>{children}</div>
+    <div className="mb-3 flex items-center justify-between">
+      <h2 className="t-label text-muted">{children}</h2>
+      {aside && <span className="text-xs text-faint">{aside}</span>}
+    </div>
   );
 }
 
-export function SectionTitle({ children, action }: { children: ReactNode; action?: ReactNode }) {
+/** The small bordered badge the design uses for CALLABLE / TERM and the like. */
+export function Pill({
+  children,
+  tone = "plain",
+  className,
+}: {
+  children: ReactNode;
+  tone?: "plain" | "accent" | "danger" | "move";
+  className?: string;
+}) {
+  const tones = {
+    plain: "border-line bg-raised text-muted",
+    accent: "border-accent-line bg-accent-soft text-accent-bright",
+    danger: "border-danger-line bg-danger-soft text-danger",
+    move: "border-move-line bg-move-soft text-move",
+  }[tone];
+
   return (
-    <div className="mb-2 flex items-baseline justify-between">
-      <h2 className="t-label text-muted">{children}</h2>
-      {action}
+    <span
+      className={cx(
+        "t-label inline-block rounded-full border px-2.5 py-1 leading-none",
+        tones,
+        className,
+      )}
+    >
+      {children}
+    </span>
+  );
+}
+
+/**
+ * A progress bar for a spending box.
+ *
+ * It fills emerald up to the target and turns red the moment it is passed,
+ * which is the only state change that matters on this screen.
+ */
+export function Bar({ filled, over }: { filled: number; over: boolean }) {
+  return (
+    <div className="h-2 w-full overflow-hidden rounded-full bg-raised">
+      <div
+        className={cx(
+          "h-full rounded-full transition-[width] duration-500",
+          over ? "bg-danger" : "bg-gradient-to-r from-accent-bright to-accent",
+        )}
+        style={{ width: `${Math.max(0, Math.min(100, filled))}%` }}
+      />
     </div>
   );
 }
 
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
-  variant?: "primary" | "secondary" | "ghost" | "danger";
+  variant?: "primary" | "secondary" | "ghost";
 };
 
 export function Button({ variant = "secondary", className, ...props }: ButtonProps) {
   const styles = {
-    primary: "bg-accent text-on-accent hover:opacity-90 disabled:bg-raised disabled:text-muted",
-    secondary: "bg-raised hover:opacity-90",
+    primary: "bg-accent text-on-accent font-bold shadow-lg shadow-accent-soft hover:bg-accent-bright",
+    secondary: "border border-line bg-raised text-ink hover:border-faint",
     ghost: "text-muted hover:text-ink",
-    danger: "bg-danger-soft text-danger hover:opacity-90",
   }[variant];
 
   return (
@@ -44,50 +108,13 @@ export function Button({ variant = "secondary", className, ...props }: ButtonPro
       {...props}
       className={cx(
         TAP,
-        "inline-flex items-center justify-center gap-2 rounded-2xl px-4 text-[15px] font-medium",
-        "transition-colors disabled:cursor-not-allowed disabled:opacity-60",
+        "inline-flex items-center justify-center gap-2 rounded-2xl px-4 text-[15px]",
+        "transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100",
         "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
         styles,
         className,
       )}
     />
-  );
-}
-
-export function Chip({
-  selected,
-  className,
-  ...props
-}: ButtonHTMLAttributes<HTMLButtonElement> & { selected?: boolean }) {
-  return (
-    <button
-      type="button"
-      aria-pressed={selected}
-      {...props}
-      className={cx(
-        "min-h-11 shrink-0 rounded-full px-4 text-[15px] whitespace-nowrap transition-colors",
-        "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
-        selected
-          ? "bg-accent text-on-accent"
-          : cx("text-ink", !hasBg(className) && "bg-surface hover:bg-raised"),
-        className,
-      )}
-    />
-  );
-}
-
-/** A horizontally scrolling chip row — faster to hit than a native select. */
-export function ChipRow({ children, label }: { children: ReactNode; label: string }) {
-  return (
-    /*
-      The negative margin lets a scrolling row bleed to the screen edge on a
-      phone, so a half-visible chip signals there is more to scroll. Inside a
-      desktop column there is no screen edge to reach, and the bleed just
-      spills a clipped chip past the column, so it is dropped from `lg` up.
-    */
-    <div role="group" aria-label={label} className="no-scrollbar -mx-4 overflow-x-auto px-4 lg:mx-0 lg:px-0">
-      <div className="flex gap-2 pb-1">{children}</div>
-    </div>
   );
 }
 
@@ -99,70 +126,25 @@ export function Label({ children, htmlFor }: { children: ReactNode; htmlFor?: st
   );
 }
 
+const FIELD = cx(
+  TAP,
+  "w-full rounded-xl border border-line bg-canvas px-4 text-base text-ink",
+  "focus:border-accent focus:outline-none",
+);
+
 export function Input({ className, ...props }: InputHTMLAttributes<HTMLInputElement>) {
-  return (
-    <input
-      {...props}
-      className={cx(
-        TAP,
-        "w-full rounded-2xl px-4 text-base",
-        !hasBg(className) && "bg-surface",
-        "focus:outline-2 focus:outline-accent",
-        className,
-      )}
-    />
-  );
+  return <input {...props} className={cx(FIELD, className)} />;
 }
 
-/** A two- or three-way toggle, used where a native select would hide the options. */
-export function Segmented<T extends string>({
-  options,
-  value,
-  onChange,
-  label,
-  className,
-}: {
-  options: readonly { value: T; label: string }[];
-  value: T;
-  onChange: (value: T) => void;
-  label: string;
-  className?: string;
-}) {
+export function Select({ className, children, ...props }: SelectHTMLAttributes<HTMLSelectElement>) {
   return (
-    <div
-      role="group"
-      aria-label={label}
-      className={cx("grid gap-1 rounded-2xl bg-raised p-1", className)}
-      style={{ gridTemplateColumns: `repeat(${options.length}, minmax(0, 1fr))` }}
-    >
-      {options.map((option) => (
-        <button
-          key={option.value}
-          type="button"
-          aria-pressed={value === option.value}
-          onClick={() => onChange(option.value)}
-          className={cx(
-            "min-h-11 rounded-xl px-2 text-[15px] font-medium transition-colors",
-            "focus-visible:outline-2 focus-visible:outline-accent",
-            value === option.value ? "bg-surface text-ink" : "text-muted",
-          )}
-        >
-          {option.label}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-export function Empty({ children }: { children: ReactNode }) {
-  return <p className="px-4 py-8 text-center text-muted">{children}</p>;
-}
-
-export function ErrorNote({ children }: { children: ReactNode }) {
-  if (!children) return null;
-  return (
-    <p role="alert" className="rounded-2xl bg-danger-soft px-4 py-3 text-danger">
+    <select {...props} className={cx(FIELD, "appearance-none pr-10", className)}>
       {children}
-    </p>
+    </select>
   );
+}
+
+/** Used wherever a list would otherwise render as a blank gap. */
+export function Empty({ children }: { children: ReactNode }) {
+  return <p className="px-4 py-10 text-center text-sm text-faint">{children}</p>;
 }
