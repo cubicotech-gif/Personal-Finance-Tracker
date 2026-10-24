@@ -1,10 +1,11 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { accountBalances, summarise } from "@/lib/ledger/accounts";
 import { useSnapshot } from "@/lib/ledger/snapshot";
+import { useApp } from "@/lib/sync/provider";
 import { Amount } from "@/components/Amount";
-import { Card, Empty, Pill, SectionTitle } from "@/components/ui";
+import { Button, Card, Empty, Pill, SectionTitle } from "@/components/ui";
 
 /**
  * Every account, with what is in it.
@@ -73,6 +74,70 @@ export function WalletsTab() {
           />
         </p>
       </Card>
+
+      <SignOut />
     </>
+  );
+}
+
+/**
+ * The only account control in the app, kept where accounts are.
+ *
+ * Signing out wipes the local copy, including anything still queued, so it
+ * syncs first and says plainly when it cannot. Someone who signs out while
+ * offline with writes pending loses them, and finding that out afterwards is
+ * not acceptable.
+ */
+function SignOut() {
+  const { email, online, pending, signOut } = useApp();
+  const [confirming, setConfirming] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  const risky = pending > 0 && !online;
+
+  return (
+    <div className="pt-2 pb-6 text-center">
+      {confirming ? (
+        <Card className="space-y-3 p-4 text-left">
+          <p className="text-sm text-muted">
+            This clears everything stored on this phone and you will have to sign in again.
+          </p>
+          {risky && (
+            <p className="rounded-xl border border-danger-line bg-danger-soft px-3 py-2 text-sm text-danger">
+              You are offline with {pending} change{pending === 1 ? "" : "s"} not yet saved to the
+              server. Signing out now loses {pending === 1 ? "it" : "them"}.
+            </p>
+          )}
+          <div className="flex gap-2">
+            <Button type="button" onClick={() => setConfirming(false)} className="flex-1">
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              disabled={busy}
+              onClick={async () => {
+                setBusy(true);
+                try {
+                  await signOut();
+                } finally {
+                  setBusy(false);
+                }
+              }}
+              className="flex-1 border-danger-line bg-danger-soft text-danger"
+            >
+              {busy ? "Signing out…" : "Sign out"}
+            </Button>
+          </div>
+        </Card>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setConfirming(true)}
+          className="text-xs text-faint underline hover:text-muted"
+        >
+          Signed in as {email ?? "—"} · sign out
+        </button>
+      )}
+    </div>
   );
 }
